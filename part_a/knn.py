@@ -1,5 +1,7 @@
 from sklearn.impute import KNNImputer
 from utils import *
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def knn_impute_by_user(matrix, valid_data, k):
@@ -60,7 +62,28 @@ def main():
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
     #####################################################################
-    pass
+
+    k_values = [1, 6, 11, 16, 21, 26]
+    accs = []
+    for k in k_values:
+        acc_score = knn_impute_by_user(sparse_matrix, val_data, k)
+        accs.append(acc_score)
+    plt.plot(k_values, accs)
+    plt.xlabel("k-Value")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy vs. k-Value")
+    plt.savefig("../img/knn_impute_by_user.png", dpi=300)
+    plt.show()
+
+    for i in range(len(k_values)):
+        print(f"k-value: {k_values[i]}, Accuracy: {accs[i]}")
+
+    k_star_index = np.argmax(accs)
+    k_star = k_values[k_star_index]
+    test_acc = knn_impute_by_user(sparse_matrix, test_data, k_star)
+    print(f"k_star: {k_star}, Test Accuracy: {test_acc}")
+
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
