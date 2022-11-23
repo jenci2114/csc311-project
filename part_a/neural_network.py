@@ -9,6 +9,7 @@ import torch.utils.data
 import numpy as np
 import torch
 
+from torch import sigmoid
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -70,7 +71,8 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        out = inputs
+        first_layer = sigmoid(self.g(inputs))
+        out = sigmoid(self.h(first_layer))
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
@@ -90,8 +92,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function. 
-    
+    # TODO: Add a regularizer to the cost function.
+
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -114,6 +116,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             target[0][nan_mask] = output[0][nan_mask]
 
             loss = torch.sum((output - target) ** 2.)
+            regularizer = 0.5 * lamb * model.get_weight_norm()
+            loss += regularizer
             loss.backward()
 
             train_loss += loss.item()
@@ -162,16 +166,18 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = None
-    model = None
+    k = 10
+    model = AutoEncoder(train_matrix.shape[1], k)
 
     # Set optimization hyperparameters.
-    lr = None
-    num_epoch = None
-    lamb = None
+    lr = 0.05
+    num_epoch = 20
+    lamb = 0.01
 
     train(model, lr, lamb, train_matrix, zero_train_matrix,
           valid_data, num_epoch)
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print("test accuracy is ", test_accuracy)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
