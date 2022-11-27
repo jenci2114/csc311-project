@@ -90,14 +90,30 @@ def update_theta_beta(data, lr, theta, beta):
     # the (i,j)-th entry = (theta_i - beta_j)
     offset = theta[:, np.newaxis] - beta[np.newaxis, :]   
     
-    # Set up the matrix to sum over
-    mat_to_sum = data - sigmoid(offset)
-    
+    if isinstance(data, np.ndarray):
+        breakpoint()
+        # Set up the matrix to sum over
+        mat_to_sum = data - sigmoid(offset)
+        
+    elif isinstance(data, dict):
+        mat_to_sum = np.zeros(shape=(len(theta), len(beta)))
+        for i in range(len(data["is_correct"])):
+            cur_user_id = data["user_id"][i]
+            cur_question_id = data["question_id"][i]
+            offset_entry = offset[cur_user_id, cur_question_id]
+            answer_correct = data["is_correct"][i]  # c_ij, 0 or 1
+            mat_to_sum[cur_user_id, cur_question_id] = \
+                answer_correct - sigmoid(offset_entry)
+
+    else:
+        raise Exception(f"Argument <data> has to be one of types \
+                        np.ndarray or dict, but {type(data)} is received")
+        
     # Calculate the derivative (vector), using nan-sum (treat nan as 0)
     d_theta = np.nansum(mat_to_sum, axis=1)
     d_beta = np.nansum((-1) * mat_to_sum, axis=0)
-    
-    # Max the log-lklihood so *add* derivative (gradient ascent)
+        
+    # Max the log-lklihood so *add* derivative (gradient ascent)  
     theta = theta + lr * d_theta  
     beta = beta + lr * d_beta
     #####################################################################
@@ -120,8 +136,18 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.zeros(data.shape[0])
-    beta = np.zeros(data.shape[1])
+    if isinstance(data, np.ndarray):
+        theta = np.zeros(data.shape[0])
+        beta = np.zeros(data.shape[1])
+        
+    elif isinstance(data, dict):
+        theta = np.zeros(max(data['user_id']) + 1)
+        beta = np.zeros(max(data['question_id']) + 1)
+    
+    else:
+        raise Exception(f"Argument <data> has to be one of types \
+                        np.ndarray or dict, but {type(data)} is received")
+        
     
     theta_lst = []  # Added line: A list of len = iterations
     beta_lst = []    # Added line: A list of len = iterations
@@ -181,7 +207,7 @@ def main():
     
     # Training & Logging 
     trained_theta, trained_beta, val_acc_lst, theta_lst, beta_lst = \
-                            irt(data=sparse_matrix.toarray(),  # Scipy sparse matrix --> numpy array
+                            irt(data=train_data,  # Scipy sparse matrix --> numpy array
                                 val_data=val_data,
                                 lr=lr,
                                 iterations=iterations
