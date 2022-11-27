@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
@@ -166,18 +167,24 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = 10
-    model = AutoEncoder(train_matrix.shape[1], k)
-
+    k_list = [10, 50, 100, 200, 500]
+    test_accuracy_list = []
     # Set optimization hyperparameters.
-    lr = 0.05
-    num_epoch = 20
-    lamb = 0.01
+    lr = 0.15
+    num_epoch = 5
+    lamb = 0.001
+    for k in k_list:
+        model = AutoEncoder(train_matrix.shape[1], k)
 
-    train(model, lr, lamb, train_matrix, zero_train_matrix,
-          valid_data, num_epoch)
-    test_accuracy = evaluate(model, zero_train_matrix, test_data)
-    print("test accuracy is ", test_accuracy)
+        train(model, lr, lamb, train_matrix, zero_train_matrix,
+              valid_data, num_epoch)
+        test_accuracy = evaluate(model, zero_train_matrix, test_data)
+        test_accuracy_list.append(test_accuracy)
+        print("test accuracy is ", test_accuracy)
+    title = "lr = " + str(lr) + " lambda = " + str(lamb) + " epoch = " + str(num_epoch)
+    plt.plot(k_list, test_accuracy_list)
+    plt.title(title)
+    plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
