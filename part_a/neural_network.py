@@ -72,12 +72,12 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        first_layer = sigmoid(self.g(inputs))
-        out = sigmoid(self.h(first_layer))
+        encoded = sigmoid(self.g(inputs))
+        decoded = sigmoid(self.h(encoded))
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
-        return out
+        return decoded
 
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
@@ -116,9 +116,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            loss = torch.sum((output - target) ** 2.)
             regularizer = 0.5 * lamb * model.get_weight_norm()
-            loss += regularizer
+            loss = torch.sum((output - target) ** 2.) + regularizer
             loss.backward()
 
             train_loss += loss.item()
@@ -160,7 +159,6 @@ def evaluate(model, train_data, valid_data):
 
 def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
-
     #####################################################################
     # TODO:                                                             #
     # Try out 5 different k and select the best k using the             #
@@ -168,12 +166,13 @@ def main():
     #####################################################################
     # Set model hyperparameters.
     k_list = [10, 50, 100, 200, 500]
+    lr_list = [0.001, 0.01, 0.1, 1]
     test_accuracy_list = []
     # Set optimization hyperparameters.
     lr = 0.15
     num_epoch = 5
     lamb = 0.001
-    for k in k_list:
+    for k in k_list:  # TODO: use three for loop and grid search
         model = AutoEncoder(train_matrix.shape[1], k)
 
         train(model, lr, lamb, train_matrix, zero_train_matrix,
@@ -182,7 +181,7 @@ def main():
         test_accuracy_list.append(test_accuracy)
         print("test accuracy is ", test_accuracy)
     title = "lr = " + str(lr) + " lambda = " + str(lamb) + " epoch = " + str(num_epoch)
-    plt.plot(k_list, test_accuracy_list)
+    plt.plot(k_list, test_accuracy_list) # TODO: add axis label
     plt.title(title)
     plt.show()
     #####################################################################
