@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.impute import KNNImputer
-from utils import evaluate
+from utils import evaluate, sigmoid
 
 
 def knn_train_predict(train_data: dict, test_data: dict, full_shape: tuple) -> list:
@@ -50,8 +50,6 @@ def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
     return evaluate(test_data, final_pred)
 
 
-import numpy as np
-from item_response import irt, sigmoid
 
 def bootstrapping(dataset, k):
     
