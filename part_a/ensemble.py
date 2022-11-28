@@ -1,7 +1,5 @@
 from utils import *
-import numpy as np
 from sklearn.impute import KNNImputer
-import utils
 import item_response as ir
 
 
