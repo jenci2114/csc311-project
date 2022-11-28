@@ -5,7 +5,8 @@ import numpy as np
 def process_student_meta(filepath: str) -> dict:
     """
     Process the student metadata
-    Output is the dictionary of user_id, age, gender, and whether student is premium
+    Output is dictionary of dictionary where
+    dict[i] = {'age': age of student with user_id i, 'gender': (resp.), 'premium': (resp.)}
     """
     student_meta = pd.read_csv(filepath)
     # Student meta data processing
@@ -39,10 +40,12 @@ def process_student_meta(filepath: str) -> dict:
         else:
             student_premium_cleaned.append(student_premium[i])
 
-    student_meta_dict = {
-        'user_id': list(student_user_id),
-        'age': student_age,
-        'gender': list(student_gender),
-        'premium': student_premium_cleaned
-    }
+    student_meta_dict = {}
+    for i in range(len(student_user_id)):
+        student_meta_dict[student_user_id[i]] = {
+            'age': student_age[i],
+            'gender': student_gender[i],
+            'premium': student_premium_cleaned[i]
+        }
+
     return student_meta_dict
