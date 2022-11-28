@@ -49,3 +49,25 @@ def process_student_meta(filepath: str) -> dict:
         }
 
     return student_meta_dict
+
+
+def process_question_meta(filepath: str, num_questions: int, num_subjects: int) -> np.array:
+    """
+    Process the question metadata
+    Output is a numpy array of shape (num_questions, num_subjects)
+    where arr[i, j] is 1 if question i is of subject j and 0 otherwise
+    """
+    question_meta = pd.read_csv(filepath).to_numpy()
+    meta_mat = np.zeros((num_questions, num_subjects))
+    for question, subject_str in question_meta:
+        subject_list = subject_str[1:-1].split(',')
+        subject_list = [int(x) for x in subject_list]
+        for subject in subject_list:
+            meta_mat[question, subject] = 1
+    return meta_mat
+
+
+def get_subject_number(filepath: str) -> int:
+    """Obtain the number of subjects from subject metadata, whose filepath is as given."""
+    subject_meta = pd.read_csv(filepath)
+    return max(subject_meta['subject_id']) + 1
