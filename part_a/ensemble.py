@@ -1,17 +1,16 @@
-from utils import *
-import numpy as np
 from sklearn.impute import KNNImputer
-import utils
+from utils import *
 import item_response as ir
+import numpy as np
 
 
 def bootstrapping(ori_dataset: dict, dataset_size):
-    
+
     ori_dataset_idx = np.arange(len(ori_dataset['user_id']))
-    iid_idx = np.random.choice(ori_dataset_idx, 
+    iid_idx = np.random.choice(ori_dataset_idx,
                                size=(3, dataset_size)
                                )
-    
+
     boots_datasets = []
     for i in range(3):
         dataset_i = {}
@@ -19,7 +18,7 @@ def bootstrapping(ori_dataset: dict, dataset_size):
             dataset_i[key] = np.array(ori_dataset[key])[iid_idx[i]].tolist()
 
         boots_datasets.append(dataset_i)
-        
+
     return boots_datasets[0], boots_datasets[1], boots_datasets[2]
 
 
@@ -77,7 +76,7 @@ def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
                   weight_normalized[2] * p3
                   for p1, p2, p3 in zip(pred1, pred2, pred3)]
 
-    return utils.evaluate(test_data, final_pred)
+    return evaluate(test_data, final_pred)
 
 
 
@@ -121,8 +120,8 @@ def main():
                             ori_dataset=train_data,
                             dataset_size=len(train_data['user_id'])
                             )
-    
-    
+
+
 
 if __name__ == "__main__":
     main()
