@@ -12,7 +12,7 @@ import torch
 
 import math
 from torch import sigmoid
-import item_response
+from part_a import item_response
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -96,7 +96,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, b
     :param num_epoch: int
     :return: None
     """
-    
+
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -176,7 +176,7 @@ def main():
         lr=0.01,
         iterations=25,
     )
-        
+
     # Set model hyperparameters.
     k_list = [10, 50, 100, 200, 500]
     lr_list = [0.001, 0.01, 0.1, 1]
