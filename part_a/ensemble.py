@@ -156,14 +156,15 @@ if __name__ == "__main__":
                             dataset_size=len(train_data['user_id'])
                             )
 
-    predictions_1 = nn_train_predict(train_data=dataset_1,
-                                     full_shape=train_shape,
-                                     test_data=val_data)
-    predictions_2 = nn_train_predict(train_data=dataset_2,
-                                     full_shape=train_shape,
-                                     test_data=val_data)
-    predictions_3 = nn_train_predict(train_data=dataset_3,
-                                     full_shape=train_shape,
-                                     test_data=val_data)
+    prediction1 = knn_train_predict(dataset_1, val_data, train_shape)
+    prediction2 = irt_train_test(dataset_2, val_data)
+    prediction3 = nn_train_predict(dataset_3, train_shape, val_data)
+    weight = (1, 2, 1)
+    acc = ensemble_evaluate(prediction1, prediction2, prediction3, weight, val_data)
+    print(f"Ensemble accuracy: {acc}")
 
-    acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3, weight=(1,1,1), test_data=val_data)
+    test_prediction1 = knn_train_predict(train_data, test_data, train_shape)
+    test_prediction2 = irt_train_test(train_data, test_data)
+    test_prediction3 = nn_train_predict(train_data, train_shape, test_data)
+    test_acc = ensemble_evaluate(test_prediction1, test_prediction2, test_prediction3, weight, test_data)
+    print(f"Ensemble accuracy on test set: {test_acc}")
