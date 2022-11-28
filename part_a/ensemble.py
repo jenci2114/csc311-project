@@ -1,6 +1,21 @@
 import numpy as np
 from sklearn.impute import KNNImputer
-from utils import evaluate, sigmoid
+import item_response as ir
+
+
+def dict_to_matrix(data: dict, full_shape: tuple) -> np.array:
+    """
+    Extract data from a dictionary to a numpy matrix, with shape <full_shape>
+    data is in the form of {user_id: list, question_id: list, is_correct: list}
+    """
+    mat = np.empty(full_shape)
+    mat[:] = np.nan
+    for i in range(len(data['user_id'])):
+        user_id = data['user_id'][i]
+        question_id = data['question_id'][i]
+        is_correct = data['is_correct'][i]
+        mat[user_id, question_id] = is_correct
+    return mat
 
 
 def knn_train_predict(train_data: dict, test_data: dict, full_shape: tuple) -> list:
@@ -14,13 +29,7 @@ def knn_train_predict(train_data: dict, test_data: dict, full_shape: tuple) -> l
     nbrs = KNNImputer(n_neighbors=11)
 
     # Obtain the matrix form of train data
-    train_matrix = np.empty(full_shape)
-    train_matrix[:] = np.nan
-    for i in range(len(train_data['user_id'])):
-        user_id = train_data['user_id'][i]
-        question_id = train_data['question_id'][i]
-        is_correct = train_data['is_correct'][i]
-        train_matrix[user_id, question_id] = is_correct
+    train_matrix = dict_to_matrix(train_data, full_shape)
 
     # Impute the matrix
     mat = nbrs.fit_transform(train_matrix)
@@ -47,42 +56,41 @@ def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
                   weight_normalized[2] * p3
                   for p1, p2, p3 in zip(pred1, pred2, pred3)]
 
-    return evaluate(test_data, final_pred)
+    return ir.evaluate(test_data, final_pred)
 
 
 
 def bootstrapping(dataset, k):
-    
-    
-    return 
+
+
+    return
 
 def irt_train_test(train_data: dict, test_data: dict) -> list:
     """
     args:
     - train_data: ...
     - test_data: ...
-    
+
     return:
-    - preds: a list of prediction as probablity value of answering 
+    - preds: a list of prediction as probablity value of answering
              correctly, each has a value in [0, 1]
     """
-    
-    
+
+
     trained_theta, trained_beta, _, _, _ = \
-                        irt(data=train_data, 
+                        ir.irt(data=train_data,
                             val_data=test_data, # dummpy, we don't use results from this
-                            lr=0.01, 
+                            lr=0.01,
                             iterations=1000
                             )
-                        
+
     preds = []
     for i, q in enumerate(test_data["question_id"]):
         u = test_data["user_id"][i]
         x = (trained_theta[u] - trained_beta[q]).sum()
-        p_a = sigmoid(x)
+        p_a = ir.sigmoid(x)
         preds.append(p_a >= 0.5)
-    
+
     return preds
-    
-    
-    
+
+
