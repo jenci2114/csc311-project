@@ -42,7 +42,7 @@ def load_data(base_path="../data"):
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, num_question, k=100):
+    def __init__(self, num_students, k=100, extra_latent_dim=0):
         """ Initialize a class AutoEncoder.
 
         :param num_question: int
@@ -51,8 +51,8 @@ class AutoEncoder(nn.Module):
         super(AutoEncoder, self).__init__()
 
         # Define linear functions.
-        self.g = nn.Linear(num_question, k)
-        self.h = nn.Linear(k + 1, num_question)
+        self.g = nn.Linear(num_students, k)
+        self.h = nn.Linear(k + extra_latent_dim, num_students)
 
     def get_weight_norm(self):
         """ Return ||W^1||^2 + ||W^2||^2.
@@ -63,7 +63,10 @@ class AutoEncoder(nn.Module):
         h_w_norm = torch.norm(self.h.weight, 2) ** 2
         return g_w_norm + h_w_norm
 
-    def forward(self, inputs, beta):
+    def get_raw_latent(self, inputs):
+        return sigmoid(self.g(inputs))
+    
+    def forward(self, inputs, beta=None):
         """ Return a forward pass given inputs.
 
         :param inputs: user vector.
@@ -74,8 +77,12 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        question_answers_latent = sigmoid(self.g(inputs))
-        question_latent = torch.cat((question_answers_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO
+        question_raw_latent = sigmoid(self.g(inputs))
+        if beta is not None:
+            question_latent = torch.cat(
+                    (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
+        else:
+            question_latent = question_raw_latent
         decoded = sigmoid(self.h(question_latent))
         #####################################################################
         #                       END OF YOUR CODE                            #
@@ -83,7 +90,16 @@ class AutoEncoder(nn.Module):
         return decoded
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, betas):
+def train(
+    model, 
+    lr, 
+    lamb, 
+    train_data, 
+    zero_train_data, 
+    valid_data, 
+    num_epoch, 
+    betas
+    ):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -108,12 +124,15 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, b
         train_loss = 0.
 
         for question_id in range(num_question):
-            beta = betas[question_id]
             inputs = Variable(zero_train_data[:, question_id]).unsqueeze(0)
             target = inputs.clone()
 
             optimizer.zero_grad()
-            output = model(inputs, beta)
+            if betas is not None:
+                beta = betas[question_id]
+                output = model(inputs, beta)
+            else:
+                output = model(inputs)
 
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[:, question_id].unsqueeze(0).numpy())
@@ -130,6 +149,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, b
         valid_acc = evaluate(model, zero_train_data, valid_data, betas)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
+
+    return model
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -152,13 +173,27 @@ def evaluate(model, train_data, valid_data, betas):
 
     for i, q in enumerate(valid_data["question_id"]):
         inputs = Variable(train_data[:, q]).unsqueeze(0)
-        output = model(inputs, betas[q])
+        if betas is not None:
+            output = model(inputs, betas[q])
+        else:
+            output = model(inputs)
 
         guess = output[0][valid_data["user_id"][i]].item() >= 0.5
         if guess == valid_data["is_correct"][i]:
             correct += 1
         total += 1
     return correct / float(total)
+
+
+def get_latent_mat(model, zero_train_data, entity='question'):
+    if entity == 'question':
+        batched_input = torch.t(zero_train_data)
+        batched_latent = model.get_raw_latent(batched_input)
+        latent_mat = torch.t(batched_latent)
+        breakpoint()
+        return latent_mat.detach().numpy()
+    
+    
 
 
 def main():
@@ -176,6 +211,8 @@ def main():
         lr=0.01,
         iterations=25,
     )
+        
+    betas = (betas - 0.5) * 2
         
     # Set model hyperparameters.
     k_list = [10, 50, 100, 200, 500]
