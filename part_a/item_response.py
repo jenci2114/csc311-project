@@ -91,7 +91,6 @@ def update_theta_beta(data, lr, theta, beta):
     offset = theta[:, np.newaxis] - beta[np.newaxis, :]   
     
     if isinstance(data, np.ndarray):
-        breakpoint()
         # Set up the matrix to sum over
         mat_to_sum = data - sigmoid(offset)
         
