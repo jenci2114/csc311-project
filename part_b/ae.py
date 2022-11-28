@@ -12,7 +12,7 @@ import torch
 
 import math
 from torch import sigmoid
-import item_response
+from part_a import item_response
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -112,7 +112,7 @@ def train(
     :param num_epoch: int
     :return: None
     """
-    
+
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -212,7 +212,7 @@ def main():
         iterations=25,
     )
         
-    betas = (betas - 0.5) * 2
+    betas = (betas - 0.5) * 2  # TODO Ways to tune this??
         
     # Set model hyperparameters.
     k_list = [10, 50, 100, 200, 500]
