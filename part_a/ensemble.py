@@ -94,7 +94,7 @@ def irt_train_test(train_data: dict, test_data: dict) -> list:
     return predictions
 
 
-def nn_train_predict(train_data: dict, test_data: dict, full_shape: tuple, valid_data: dict) -> list:
+def nn_train_predict(train_data: dict, full_shape: tuple, test_data: dict) -> list:
     """
     Use neural network to generate a prediction, hyperparameter as tuned in the previous part:
         - k = 100
@@ -116,13 +116,13 @@ def nn_train_predict(train_data: dict, test_data: dict, full_shape: tuple, valid
     nn_model = AutoEncoder(train_matrix.shape[1], k)
     nn_model.train()
     train(nn_model, learning_rate, lamb, train_matrix, zero_train_matrix,
-          valid_data, num_epoch)
+          test_data, num_epoch)
 
     # Make predictions
     nn_model.eval()
     predictions = []
     for i, u in enumerate(test_data["user_id"]):
-        inputs = Variable(train_data[u]).unsqueeze(0)
+        inputs = Variable(zero_train_matrix[u]).unsqueeze(0)
         output = nn_model(inputs)
         guess = output[0][test_data["question_id"][i]].item() >= 0.5
         predictions.append(guess)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     train_data = load_train_csv("../data")
     val_data = load_valid_csv("../data")
     test_data = load_public_test_csv("../data")
-
+    train_shape = max(train_data['user_id']) + 1, max(train_data['question_id']) + 1
 
     dataset_1, dataset_2, dataset_3\
                         = bootstrapping(
@@ -157,12 +157,15 @@ if __name__ == "__main__":
                             )
 
 
-    predictions_1 = irt_train_test(train_data=dataset_1,
-                                    test_data=test_data)
-    predictions_2 = irt_train_test(train_data=dataset_2,
-                                    test_data=test_data)
-    predictions_3 = irt_train_test(train_data=dataset_3,
-                                    test_data=test_data)
+    predictions_1 = nn_train_predict(train_data=dataset_1,
+                                     full_shape=train_shape,
+                                     test_data=val_data)
+    predictions_2 = nn_train_predict(train_data=dataset_2,
+                                     full_shape=train_shape,
+                                     test_data=val_data)
+    predictions_3 = nn_train_predict(train_data=dataset_3,
+                                     full_shape=train_shape,
+                                     test_data=val_data)
 
-    acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3)
+    acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3, weight=(1,1,1), test_data=val_data)
     print(acc)
