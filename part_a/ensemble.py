@@ -2,6 +2,9 @@ from sklearn.impute import KNNImputer
 from utils import *
 import item_response as ir
 import numpy as np
+from neural_network import AutoEncoder, train
+import torch
+from torch.autograd import Variable
 
 
 def bootstrapping(ori_dataset: dict, dataset_size):
@@ -107,6 +110,41 @@ def irt_train_test(train_data: dict, test_data: dict) -> list:
         preds.append(p_a >= 0.5)
 
     return preds
+
+
+def nn_train_predict(train_data: dict, test_data: dict, full_shape: tuple, valid_data: dict) -> list:
+    """
+    Use neural network to generate a prediction, hyperparameter as tuned in the previous part:
+        - k = 100
+        - learning rate = 0.1
+        - epoch = 5
+    The input dictionaries are of form {user_id: list, question_id: list, is_correct: list}
+    """
+    # Obtain the training matrix form of train data
+    train_matrix = dict_to_matrix(train_data, full_shape)
+    zero_train_matrix = train_matrix.copy()
+    zero_train_matrix[np.isnan(train_matrix)] = 0
+    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
+    train_matrix = torch.FloatTensor(train_matrix)
+    # create neural network model and train it
+    k = 100
+    learning_rate = 0.1
+    num_epoch = 5
+    lamb = 0.01
+    nn_model = AutoEncoder(train_matrix.shape[1], k)
+    nn_model.train()
+    train(nn_model, learning_rate, lamb, train_matrix, zero_train_matrix,
+          valid_data, num_epoch)
+
+    # Make predictions
+    nn_model.eval()
+    predictions = []
+    for i, u in enumerate(test_data["user_id"]):
+        inputs = Variable(train_data[u]).unsqueeze(0)
+        output = nn_model(inputs)
+        guess = output[0][test_data["question_id"][i]].item() >= 0.5
+        predictions.append(guess)
+    return predictions
 
 
 def main():
