@@ -1,6 +1,23 @@
+from utils import *
 import numpy as np
 from sklearn.impute import KNNImputer
-from utils import evaluate, sigmoid
+
+def bootstrapping(ori_dataset: dict, dataset_size):
+    
+    ori_dataset_idx = np.arange(len(ori_dataset['user_id']))
+    iid_idx = np.random.choice(ori_dataset_idx, 
+                               size=(3, dataset_size)
+                               )
+    
+    boots_datasets = []
+    for i in range(3):
+        dataset_i = {}
+        for key in ori_dataset.keys():
+            dataset_i[key] = np.array(ori_dataset[key])[iid_idx[i]].tolist()
+
+        boots_datasets.append(dataset_i)
+        
+    return boots_datasets[0], boots_datasets[1], boots_datasets[2]
 
 
 def knn_train_predict(train_data: dict, test_data: dict, full_shape: tuple) -> list:
@@ -49,13 +66,6 @@ def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
 
     return evaluate(test_data, final_pred)
 
-
-
-def bootstrapping(dataset, k):
-    
-    
-    return 
-
 def irt_train_test(train_data: dict, test_data: dict) -> list:
     """
     args:
@@ -85,4 +95,21 @@ def irt_train_test(train_data: dict, test_data: dict) -> list:
     return preds
     
     
+def main():
+    train_data = load_train_csv("../data")
+    val_data = load_valid_csv("../data")
+    test_data = load_public_test_csv("../data")
+
+
+    dataset_1, dataset_2, dataset_3\
+                        = bootstrapping(
+                            ori_dataset=train_data,
+                            dataset_size=len(train_data['user_id'])
+                            )
     
+    breakpoint()
+    
+    
+    
+if __name__ == "__main__":
+    main()
