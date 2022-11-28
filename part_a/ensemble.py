@@ -154,7 +154,7 @@ if __name__ == "__main__":
                             ori_dataset=train_data,
                             dataset_size=len(train_data['user_id'])
                             )
-    # IRT Ensemble
+    ############# 3 IRT Ensemble #############
     predictions_1 = irt_train_test(train_data=dataset_1, test_data=test_data)
     predictions_2 = irt_train_test(train_data=dataset_2, test_data=test_data)
     predictions_3 = irt_train_test(train_data=dataset_3, test_data=test_data)
@@ -167,3 +167,4 @@ if __name__ == "__main__":
         test_data=test_data
         )
     print(acc)
+    ##########################################
