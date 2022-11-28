@@ -81,7 +81,7 @@ def irt_train_test(train_data: dict, test_data: dict) -> list:
                         ir.irt(data=train_data,
                             val_data=test_data, # dummpy, we don't use results from this
                             lr=0.01,
-                            iterations=1000
+                            iterations=25
                             )
 
     predictions = []
@@ -156,7 +156,6 @@ if __name__ == "__main__":
                             dataset_size=len(train_data['user_id'])
                             )
 
-
     predictions_1 = nn_train_predict(train_data=dataset_1,
                                      full_shape=train_shape,
                                      test_data=val_data)
@@ -168,4 +167,3 @@ if __name__ == "__main__":
                                      test_data=val_data)
 
     acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3, weight=(1,1,1), test_data=val_data)
-    print(acc)
