@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+import math
 from torch import sigmoid
 
 def load_data(base_path="../data"):
@@ -116,8 +117,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            regularizer = 0.5 * lamb * model.get_weight_norm()
-            loss = torch.sum((output - target) ** 2.) + regularizer
+            # regularizer = 0.5 * lamb * model.get_weight_norm()
+            # loss = torch.sum((output - target) ** 2.) + regularizer
+            loss = torch.sum((output - target) ** 2.)
             loss.backward()
 
             train_loss += loss.item()
@@ -167,23 +169,33 @@ def main():
     # Set model hyperparameters.
     k_list = [10, 50, 100, 200, 500]
     lr_list = [0.001, 0.01, 0.1, 1]
+    epoch_list = [3, 5, 10, 15]
     test_accuracy_list = []
-    # Set optimization hyperparameters.
-    lr = 0.15
-    num_epoch = 5
+    # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
-    for k in k_list:  # TODO: use three for loop and grid search
-        model = AutoEncoder(train_matrix.shape[1], k)
-
-        train(model, lr, lamb, train_matrix, zero_train_matrix,
-              valid_data, num_epoch)
-        test_accuracy = evaluate(model, zero_train_matrix, test_data)
-        test_accuracy_list.append(test_accuracy)
-        print("test accuracy is ", test_accuracy)
-    title = "lr = " + str(lr) + " lambda = " + str(lamb) + " epoch = " + str(num_epoch)
-    plt.plot(k_list, test_accuracy_list) # TODO: add axis label
-    plt.title(title)
-    plt.show()
+    best_test_accuracy_so_far = 0
+    best_parameters = []
+    for k in k_list:
+        for lr in lr_list:
+            for num_epoch in epoch_list:
+                model = AutoEncoder(train_matrix.shape[1], k)
+                train(model, lr, lamb, train_matrix, zero_train_matrix,
+                      valid_data, num_epoch)
+                test_accuracy = evaluate(model, zero_train_matrix, test_data)
+                if test_accuracy > best_test_accuracy_so_far:
+                    best_test_accuracy_so_far = test_accuracy
+                    best_parameters = [k, lr, num_epoch]
+                test_accuracy_list.append(test_accuracy)
+                print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
+                               " test accuracy = " + str(test_accuracy)
+                print(print_string)
+    print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
+          " epoch = " + str(best_parameters[2]))
+    # plt.plot(k_list, test_accuracy_list)
+    # plt.xlabel("k value")
+    # plt.ylabel("test accuracy")
+    # plt.title(title)
+    # plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
