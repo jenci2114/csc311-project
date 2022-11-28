@@ -78,7 +78,7 @@ def irt_train_test(train_data: dict, test_data: dict) -> list:
                         ir.irt(data=train_data,
                             val_data=test_data, # dummpy, we don't use results from this
                             lr=0.01,
-                            iterations=1000
+                            iterations=25
                             )
 
     predictions = []
@@ -111,20 +111,21 @@ if __name__ == "__main__":
     val_data = load_valid_csv("../data")
     test_data = load_public_test_csv("../data")
 
-
     dataset_1, dataset_2, dataset_3\
                         = bootstrapping(
                             ori_dataset=train_data,
                             dataset_size=len(train_data['user_id'])
                             )
 
+    predictions_1 = irt_train_test(train_data=dataset_1, test_data=test_data)
+    predictions_2 = irt_train_test(train_data=dataset_2, test_data=test_data)
+    predictions_3 = irt_train_test(train_data=dataset_3, test_data=test_data)
     
-    predictions_1 = irt_train_test(train_data=dataset_1,
-                                    test_data=test_data)
-    predictions_2 = irt_train_test(train_data=dataset_2,
-                                    test_data=test_data)
-    predictions_3 = irt_train_test(train_data=dataset_3,
-                                    test_data=test_data)
-    
-    acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3)
+    acc = ensemble_evaluate(
+        pred1=predictions_1, 
+        pred2=predictions_2, 
+        pred3=predictions_3, 
+        weight=(1, 1, 1), 
+        test_data=test_data
+        )
     print(acc)
