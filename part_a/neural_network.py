@@ -103,10 +103,17 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
 
+    # the three lists below are used to plot
+    epoch_list = []
+    training_loss_list = []
+    validation_loss_list = []
+
     for epoch in range(0, num_epoch):
         train_loss = 0.
+        valid_loss = 0
 
         for user_id in range(num_student):
+            model.train()
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
             target = inputs.clone()
 
@@ -117,17 +124,42 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            # regularizer = 0.5 * lamb * model.get_weight_norm()
-            # loss = torch.sum((output - target) ** 2.) + regularizer
-            loss = torch.sum((output - target) ** 2.)
+            regularizer = 0.5 * lamb * model.get_weight_norm()
+            loss = torch.sum((output - target) ** 2.) + regularizer
+            # loss = torch.sum((output - target) ** 2.)
             loss.backward()
 
             train_loss += loss.item()
             optimizer.step()
 
+            # for part 3 ii d
+            # with torch.no_grad():
+            #     model.eval()
+            #     for i, u in enumerate(valid_data["user_id"]):
+            #         valid_inputs = Variable(zero_train_data[u]).unsqueeze(0)
+            #         valid_output = model(valid_inputs)
+            #         valid_guess = valid_output[0][valid_data["question_id"][i]].item()
+            #         valid_loss += (valid_guess - valid_data["is_correct"][i]) ** 2.
+
         valid_acc = evaluate(model, zero_train_data, valid_data)
+        # print("Epoch: {} \tTraining Cost: {:.6f}\t "
+        #       "Valid Acc: {}\tValid Cost: {:.6f}".format(epoch, train_loss, valid_acc, valid_loss))
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
+        epoch_list.append(epoch)
+        training_loss_list.append(train_loss)
+        validation_loss_list.append(valid_acc)
+    plt.plot(epoch_list, training_loss_list)
+    plt.xlabel("epoch number")
+    plt.ylabel("training objective")
+    plt.title("epoch vs training objective")
+    plt.show()
+
+    plt.plot(epoch_list, validation_loss_list)
+    plt.xlabel("epoch number")
+    plt.ylabel("validation accuracy")
+    plt.title("epoch vs validation accuracy")
+    plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -171,6 +203,7 @@ def main():
     lr_list = [0.001, 0.01, 0.1, 1]
     epoch_list = [3, 5, 10, 15]
     test_accuracy_list = []
+
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
     best_test_accuracy_so_far = 0
@@ -190,12 +223,50 @@ def main():
                                " test accuracy = " + str(test_accuracy)
                 print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]))
-    # plt.plot(k_list, test_accuracy_list)
-    # plt.xlabel("k value")
-    # plt.ylabel("test accuracy")
-    # plt.title(title)
-    # plt.show()
+          " epoch = " + str(best_parameters[2]) + " test accuracy = ", best_test_accuracy_so_far)
+
+    # Q3, ii, d
+    lamb = 0.001
+    k = 10
+    lr = 0.1
+    num_epoch = 10
+
+    model = AutoEncoder(train_matrix.shape[1], k)
+    train(model, lr, lamb, train_matrix, zero_train_matrix,
+          valid_data, num_epoch)
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    test_accuracy_list.append(test_accuracy)
+    print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
+                   " test accuracy = " + str(test_accuracy)
+    print(print_string)
+
+    # Q3, ii, e
+    k = 10
+    lr = 0.1
+    num_epoch = 10
+    lambda_list = [0.001, 0.01, 0.1, 1]
+    accuracy_list = []
+    best_test_accuracy_so_far = 0
+    best_parameters = 0
+    for lamb in lambda_list:
+        model = AutoEncoder(train_matrix.shape[1], k)
+        train(model, lr, lamb, train_matrix, zero_train_matrix,
+              valid_data, num_epoch)
+        test_accuracy = evaluate(model, zero_train_matrix, test_data)
+        if test_accuracy > best_test_accuracy_so_far:
+            best_test_accuracy_so_far = test_accuracy
+            best_parameters = lamb
+        test_accuracy_list.append(test_accuracy)
+        accuracy_list.append(test_accuracy)
+        print_string = "lambda = " + str(lamb) + " test accuracy = " + str(test_accuracy)
+        print(print_string)
+    print("best lambda is "  + str(best_parameters) + " best accuracy is "  + str(best_test_accuracy_so_far))
+
+    plt.plot(lambda_list, accuracy_list)
+    plt.xlabel("lambda")
+    plt.ylabel("test accuracy")
+    plt.title("lambda vs test accuracy")
+    plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
