@@ -64,6 +64,33 @@ def knn_train_predict(train_data: dict, test_data: dict, full_shape: tuple) -> l
     return predictions
 
 
+def irt_train_test(train_data: dict, test_data: dict) -> list:
+    """
+    args:
+    - train_data: ...
+    - test_data: ...
+
+    return:
+    - preds: a list of prediction as probablity value of answering
+             correctly, each has a value in [0, 1]
+    """
+    trained_theta, trained_beta, _, _, _ = \
+                        ir.irt(data=train_data,
+                            val_data=test_data, # dummpy, we don't use results from this
+                            lr=0.01,
+                            iterations=1000
+                            )
+
+    predictions = []
+    for i, q in enumerate(test_data["question_id"]):
+        u = test_data["user_id"][i]
+        x = (trained_theta[u] - trained_beta[q]).sum()
+        p_a = ir.sigmoid(x)
+        predictions.append(p_a >= 0.5)
+
+    return predictions
+
+
 def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
                       weight: tuple[int, int, int], test_data: dict) -> float:
     """
@@ -79,37 +106,7 @@ def ensemble_evaluate(pred1: list, pred2: list, pred3: list,
     return evaluate(test_data, final_pred)
 
 
-
-def irt_train_test(train_data: dict, test_data: dict) -> list:
-    """
-    args:
-    - train_data: ...
-    - test_data: ...
-
-    return:
-    - preds: a list of prediction as probablity value of answering
-             correctly, each has a value in [0, 1]
-    """
-
-
-    trained_theta, trained_beta, _, _, _ = \
-                        ir.irt(data=train_data,
-                            val_data=test_data, # dummpy, we don't use results from this
-                            lr=0.01,
-                            iterations=1000
-                            )
-
-    preds = []
-    for i, q in enumerate(test_data["question_id"]):
-        u = test_data["user_id"][i]
-        x = (trained_theta[u] - trained_beta[q]).sum()
-        p_a = ir.sigmoid(x)
-        preds.append(p_a >= 0.5)
-
-    return preds
-
-
-def main():
+if __name__ == "__main__":
     train_data = load_train_csv("../data")
     val_data = load_valid_csv("../data")
     test_data = load_public_test_csv("../data")
@@ -121,7 +118,13 @@ def main():
                             dataset_size=len(train_data['user_id'])
                             )
 
-
-
-if __name__ == "__main__":
-    main()
+    
+    predictions_1 = irt_train_test(train_data=dataset_1,
+                                    test_data=test_data)
+    predictions_2 = irt_train_test(train_data=dataset_2,
+                                    test_data=test_data)
+    predictions_3 = irt_train_test(train_data=dataset_3,
+                                    test_data=test_data)
+    
+    acc = ensemble_evaluate(predictions_1, pred2=predictions_2, pred3=predictions_3)
+    print(acc)
