@@ -196,9 +196,9 @@ def main():
     thetas = (thetas - 0.5) * 2
 
     # Set model hyperparameters.
-    k_list = [10, 50, 100, 200, 500]
-    lr_list = [0.001, 0.01, 0.1, 1]
-    epoch_list = [3, 5, 10, 15]
+    k_list = [20]
+    lr_list = [0.01]
+    epoch_list = [20]
     test_accuracy_list = []
 
     # Q3, ii, c, tune k, learning rate, and number of epoch

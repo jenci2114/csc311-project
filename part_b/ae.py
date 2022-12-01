@@ -65,7 +65,7 @@ class AutoEncoder(nn.Module):
 
     def get_raw_latent(self, inputs):
         return sigmoid(self.g(inputs))
-    
+
     def forward(self, inputs, beta=None):
         """ Return a forward pass given inputs.
 
@@ -91,13 +91,13 @@ class AutoEncoder(nn.Module):
 
 
 def train(
-    model, 
-    lr, 
-    lamb, 
-    train_data, 
-    zero_train_data, 
-    valid_data, 
-    num_epoch, 
+    model,
+    lr,
+    lamb,
+    train_data,
+    zero_train_data,
+    valid_data,
+    num_epoch,
     betas
     ):
     """ Train the neural network, where the objective also includes
@@ -192,8 +192,8 @@ def get_latent_mat(model, zero_train_data, entity='question'):
         latent_mat = torch.t(batched_latent)
         breakpoint()
         return latent_mat.detach().numpy()
-    
-    
+
+
 
 
 def main():
@@ -211,13 +211,13 @@ def main():
         lr=0.01,
         iterations=25,
     )
-        
+
     betas = (betas - 0.5) * 2  # TODO Ways to tune this??
-        
+
     # Set model hyperparameters.
-    k_list = [10, 50, 100, 200, 500]
-    lr_list = [0.001, 0.01, 0.1, 1]
-    epoch_list = [3, 5, 10, 15]
+    k_list = [20]
+    lr_list = [0.01]
+    epoch_list = [15]
     test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
@@ -226,7 +226,7 @@ def main():
     for k in k_list:
         for lr in lr_list:
             for num_epoch in epoch_list:
-                model = AutoEncoder(train_matrix.shape[0], k)
+                model = AutoEncoder(train_matrix.shape[0], k, 1)
                 train(model, lr, lamb, train_matrix, zero_train_matrix,
                       valid_data, num_epoch, betas)
                 test_accuracy = evaluate(model, zero_train_matrix, test_data, betas)
