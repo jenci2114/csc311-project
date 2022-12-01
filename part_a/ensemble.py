@@ -163,8 +163,15 @@ if __name__ == "__main__":
     acc = ensemble_evaluate(prediction1, prediction2, prediction3, weight, val_data)
     print(f"Ensemble accuracy: {acc}")
 
+    valid_prediction1 = knn_train_predict(train_data, val_data, train_shape)
+    valid_prediction2 = irt_train_test(train_data, val_data)
+    valid_prediction3 = nn_train_predict(train_data, train_shape, val_data)
+    valid_acc = ensemble_evaluate(valid_prediction1, valid_prediction2, valid_prediction3, weight, val_data)
+    print(f"Ensemble accuracy on valid set: {valid_acc}")
+
     test_prediction1 = knn_train_predict(train_data, test_data, train_shape)
     test_prediction2 = irt_train_test(train_data, test_data)
     test_prediction3 = nn_train_predict(train_data, train_shape, test_data)
     test_acc = ensemble_evaluate(test_prediction1, test_prediction2, test_prediction3, weight, test_data)
+
     print(f"Ensemble accuracy on test set: {test_acc}")
