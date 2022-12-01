@@ -125,6 +125,7 @@ if __name__ == '__main__':
 
     # Bootstrap
     dataset_1, dataset_2 = bootstrapping(train_data, len(train_data['user_id']))
+    # dataset_1, dataset_2 = train_data, train_data
 
     train_matrix_1 = dict_to_matrix(dataset_1, train_shape)
     zero_train_matrix_1 = train_matrix_1.copy()
@@ -139,12 +140,12 @@ if __name__ == '__main__':
     train_matrix_2 = torch.FloatTensor(train_matrix_2)
 
     # Prediction from user-based autoencoder
-    predictions_1 = ae_user_predict(zero_train_matrix_1, train_matrix_1, val_data, thetas)
+    predictions_1 = ae_user_predict(zero_train_matrix_1, train_matrix_1, test_data, thetas)
 
     # Prediction from question-based autoencoder
-    predictions_2 = ae_question_predict(zero_train_matrix_2, train_matrix_2, val_data, betas)
+    predictions_2 = ae_question_predict(zero_train_matrix_2, train_matrix_2, test_data, betas)
 
     # Combine predictions
-    weight = (1, 2)
-    acc = ensemble_evaluate(predictions_1, predictions_2, weight, val_data)
+    weight = (4, 5)
+    acc = ensemble_evaluate(predictions_1, predictions_2, weight, test_data)
     print(f"Validation accuracy: {acc}")
