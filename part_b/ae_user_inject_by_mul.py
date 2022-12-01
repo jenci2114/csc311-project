@@ -41,18 +41,26 @@ def load_data(base_path="../data"):
     return zero_train_matrix, train_matrix, valid_data, test_data
 
 
-class AutoEncoder(nn.Module):
-    def __init__(self, num_students, k=100, extra_latent_dim=0):
+class AutoEncoderUser(nn.Module):
+    def __init__(self, num_question, k=100, extra_latent_dim=0):
         """ Initialize a class AutoEncoder.
 
         :param num_question: int
         :param k: int
+        :param extra_latent_dim: int
         """
-        super(AutoEncoder, self).__init__()
+        super(AutoEncoderUser, self).__init__()
 
         # Define linear functions.
-        self.g = nn.Linear(num_students, k)
-        self.h = nn.Linear(k + extra_latent_dim, num_students)
+        self.g = nn.Linear(num_question, k)
+        self.h = nn.Linear(k + extra_latent_dim, num_question)
+
+        self.last = nn.Linear(num_question, num_question)
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                nn.init.constant_(m.bias, 0)
+                print("Linear layer weight initialized to xavier normal")
 
     def get_weight_norm(self):
         """ Return ||W^1||^2 + ||W^2||^2.
@@ -66,7 +74,7 @@ class AutoEncoder(nn.Module):
     def get_raw_latent(self, inputs):
         return sigmoid(self.g(inputs))
 
-    def forward(self, inputs, beta=None):
+    def forward(self, inputs, beta=None, theta=None):
         """ Return a forward pass given inputs.
 
         :param inputs: user vector.
@@ -77,29 +85,25 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        question_raw_latent = sigmoid(self.g(inputs))
-        if beta is not None:
-            question_latent = torch.cat(
-                    (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
+        user_raw_latent = sigmoid(self.g(inputs))
+        if theta is not None:
+            user_latent = torch.cat((user_raw_latent,
+                                     torch.tensor([[theta]], dtype=torch.float32)), axis=-1)
         else:
-            question_latent = question_raw_latent
-        decoded = sigmoid(self.h(question_latent))
+            user_latent = user_raw_latent
+
+        raw_pred = sigmoid(self.h(user_latent))
+
+        beta_inject_raw = raw_pred * beta
+        beta_inject_pred = self.last(beta_inject_raw)
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
-        return decoded
+        out = sigmoid(beta_inject_pred)
+        return out
 
 
-def train(
-    model,
-    lr,
-    lamb,
-    train_data,
-    zero_train_data,
-    valid_data,
-    num_epoch,
-    betas
-    ):
+def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, betas, thetas):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -110,7 +114,9 @@ def train(
     :param zero_train_data: 2D FloatTensor
     :param valid_data: Dict
     :param num_epoch: int
-    :return: None
+    :param betas: array
+    :param thetas: array
+    :return: model
     """
 
     # Tell PyTorch you are training the model.
@@ -118,24 +124,24 @@ def train(
 
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
-    num_question = train_data.shape[1]
+    num_student = train_data.shape[0]
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
 
-        for question_id in range(num_question):
-            inputs = Variable(zero_train_data[:, question_id]).unsqueeze(0)
+        for user_id in range(num_student):
+            inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
             target = inputs.clone()
 
             optimizer.zero_grad()
-            if betas is not None:
-                beta = betas[question_id]
-                output = model(inputs, beta)
+            if thetas is not None:
+                theta = thetas[user_id]
+                output = model(inputs, betas, theta)
             else:
                 output = model(inputs)
 
             # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[:, question_id].unsqueeze(0).numpy())
+            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
             # regularizer = 0.5 * lamb * model.get_weight_norm()
@@ -146,7 +152,7 @@ def train(
             train_loss += loss.item()
             optimizer.step()
 
-        valid_acc = evaluate(model, zero_train_data, valid_data, betas)
+        valid_acc = evaluate(model, zero_train_data, valid_data, betas, thetas)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
 
@@ -156,13 +162,15 @@ def train(
     #####################################################################
 
 
-def evaluate(model, train_data, valid_data, betas):
+def evaluate(model, train_data, valid_data, betas, thetas):
     """ Evaluate the valid_data on the current model.
 
     :param model: Module
     :param train_data: 2D FloatTensor
     :param valid_data: A dictionary {user_id: list,
     question_id: list, is_correct: list}
+    :param betas: array
+    :param thetas: array
     :return: float
     """
     # Tell PyTorch you are evaluating the model.
@@ -171,29 +179,18 @@ def evaluate(model, train_data, valid_data, betas):
     total = 0
     correct = 0
 
-    for i, q in enumerate(valid_data["question_id"]):
-        inputs = Variable(train_data[:, q]).unsqueeze(0)
-        if betas is not None:
-            output = model(inputs, betas[q])
+    for i, u in enumerate(valid_data["user_id"]):
+        inputs = Variable(train_data[u]).unsqueeze(0)
+        if thetas is not None:
+            output = model(inputs, betas, thetas[u])
         else:
             output = model(inputs)
 
-        guess = output[0][valid_data["user_id"][i]].item() >= 0.5
+        guess = output[0][valid_data["question_id"][i]].item() >= 0.5
         if guess == valid_data["is_correct"][i]:
             correct += 1
         total += 1
     return correct / float(total)
-
-
-def get_latent_mat(model, zero_train_data, entity='question'):
-    if entity == 'question':
-        batched_input = torch.t(zero_train_data)
-        batched_latent = model.get_raw_latent(batched_input)
-        latent_mat = torch.t(batched_latent)
-        breakpoint()
-        return latent_mat.detach().numpy()
-
-
 
 
 def main():
@@ -203,22 +200,24 @@ def main():
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
+
     # Pre-train IRT model
-    _, betas, _, _, _ = \
-        item_response.irt(
+    thetas, betas, _, _, _ = item_response.irt(
         data=train_matrix.detach().numpy(),
         val_data=valid_data,
         lr=0.01,
-        iterations=25,
+        iterations=25
     )
 
-    # betas = (betas - 0.5) * 2  # TODO Ways to tune this??
+    thetas = thetas  # find ways of normalizing this
+    betas = torch.tensor(betas, dtype=torch.float32)
 
     # Set model hyperparameters.
-    k_list = [50]  # 10, 50, 100, 200
-    lr_list = [0.01]  # 0.001, 0.01, 0.1, 1
-    epoch_list = [10, 15, 20]  # 3, 5, 10, 15
+    k_list = [20, 50]  # 10, 50, 100, 200
+    lr_list = [0.03]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [15, 20]  # 3, 5, 10, 15
     test_accuracy_list = []
+
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
     best_test_accuracy_so_far = 0
@@ -226,10 +225,10 @@ def main():
     for k in k_list:
         for lr in lr_list:
             for num_epoch in epoch_list:
-                model = AutoEncoder(train_matrix.shape[0], k, 1)
+                model = AutoEncoderUser(train_matrix.shape[1], k, 1)
                 train(model, lr, lamb, train_matrix, zero_train_matrix,
-                      valid_data, num_epoch, betas)
-                test_accuracy = evaluate(model, zero_train_matrix, test_data, betas)
+                      valid_data, num_epoch, betas, thetas)
+                test_accuracy = evaluate(model, zero_train_matrix, test_data, betas, thetas)
                 if test_accuracy > best_test_accuracy_so_far:
                     best_test_accuracy_so_far = test_accuracy
                     best_parameters = [k, lr, num_epoch]
@@ -238,16 +237,12 @@ def main():
                                " test accuracy = " + str(test_accuracy)
                 print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", best_test_accuracy_so_far)
-    # plt.plot(k_list, test_accuracy_list)
-    # plt.xlabel("k value")
-    # plt.ylabel("test accuracy")
-    # plt.title(title)
-    # plt.show()
+          " epoch = " + str(best_parameters[2]) + " test accuracy = ", best_test_accuracy_so_far)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
 
 
 if __name__ == "__main__":
+    torch.manual_seed(311)
     main()

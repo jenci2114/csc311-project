@@ -12,8 +12,8 @@ import torch
 
 import math
 from torch import sigmoid
-# from part_a import item_response
-import item_response
+from part_a import item_response
+# import item_response
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -54,9 +54,9 @@ class AutoEncoder(nn.Module):
         # Define linear functions.
         self.g = nn.Linear(num_students, k)
         self.h = nn.Linear(k + extra_latent_dim, num_students)
-        
+
         self.last = nn.Linear(num_students, num_students)
-        
+
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_normal_(m.weight)
@@ -92,12 +92,12 @@ class AutoEncoder(nn.Module):
                     (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
         else:
             question_latent = question_raw_latent
-        
+
         raw_pred = sigmoid(self.h(question_latent))
 
         theta_inject_raw = raw_pred * theta
         theta_inject_pred = self.last(theta_inject_raw)
-        
+
         out = sigmoid(theta_inject_pred)
         #####################################################################
         #                       END OF YOUR CODE                            #
@@ -227,7 +227,7 @@ def main():
         lr=0.01,
         iterations=25,
     )
-    
+
     betas = betas
 
     # thetas = (thetas - thetas.min()) / (thetas.max() - thetas.min())
@@ -246,20 +246,20 @@ def main():
         for lr in lr_list:
             for num_epoch in epoch_list:
                 model = AutoEncoder(train_matrix.shape[0], k, 1)
-                train(model, 
-                      lr, 
-                      lamb, 
-                      train_matrix, 
+                train(model,
+                      lr,
+                      lamb,
+                      train_matrix,
                       zero_train_matrix,
-                      valid_data, 
-                      num_epoch, 
-                      betas, 
+                      valid_data,
+                      num_epoch,
+                      betas,
                       thetas
                       )
-                test_accuracy = evaluate(model, 
-                                         zero_train_matrix, 
-                                         test_data, 
-                                         betas, 
+                test_accuracy = evaluate(model,
+                                         zero_train_matrix,
+                                         test_data,
+                                         betas,
                                          thetas
                                          )
                 if test_accuracy > best_test_accuracy_so_far:
