@@ -12,6 +12,8 @@ import torch
 
 import math
 from torch import sigmoid
+from torch.nn import LeakyReLU
+from part_a import item_response
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -41,7 +43,7 @@ def load_data(base_path="../data"):
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, num_question, k=100):
+    def __init__(self, num_students, k=100, extra_latent_dim=0):
         """ Initialize a class AutoEncoder.
 
         :param num_question: int
@@ -50,19 +52,30 @@ class AutoEncoder(nn.Module):
         super(AutoEncoder, self).__init__()
 
         # Define linear functions.
-        self.g = nn.Linear(num_question, k)
-        self.h = nn.Linear(k, num_question)
+        self.f = nn.Linear(num_students, num_students)
+        nn.init.xavier_normal_(self.f.weight)
+
+        self.g = nn.Linear(num_students, k)
+        nn.init.xavier_normal_(self.g.weight)
+
+        self.h = nn.Linear(k, num_students)
+        nn.init.xavier_normal_(self.h.weight)
+
+        self.i = nn.Linear(num_students, num_students)
+        nn.init.xavier_normal_(self.i.weight)
 
     def get_weight_norm(self):
         """ Return ||W^1||^2 + ||W^2||^2.
 
         :return: float
         """
+        f_w_norm = torch.norm(self.f.weight, 2) ** 2
         g_w_norm = torch.norm(self.g.weight, 2) ** 2
         h_w_norm = torch.norm(self.h.weight, 2) ** 2
-        return g_w_norm + h_w_norm
+        i_w_norm = torch.norm(self.i.weight, 2) ** 2
+        return f_w_norm + g_w_norm + h_w_norm + i_w_norm
 
-    def forward(self, inputs):
+    def forward(self, inputs, beta=None):
         """ Return a forward pass given inputs.
 
         :param inputs: user vector.
@@ -73,15 +86,26 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        encoded = sigmoid(self.g(inputs))
-        decoded = sigmoid(self.h(encoded))
+        layer_one = sigmoid(self.f(inputs))
+        layer_two = sigmoid(self.g(layer_one))
+        layer_three = sigmoid(self.h(layer_two))
+        layer_four = sigmoid(self.i(layer_three))
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
-        return decoded
+        return layer_four
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(
+    model,
+    lr,
+    lamb,
+    train_data,
+    zero_train_data,
+    valid_data,
+    num_epoch,
+    betas
+    ):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -94,80 +118,51 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function.
 
     # Tell PyTorch you are training the model.
     model.train()
 
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
-    num_student = train_data.shape[0]
-
-    # the three lists below are used to plot
-    epoch_list = []
-    training_loss_list = []
-    validation_loss_list = []
+    num_question = train_data.shape[1]
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
-        valid_loss = 0
 
-        for user_id in range(num_student):
-            model.train()
-            inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
+        for question_id in range(num_question):
+            inputs = Variable(zero_train_data[:, question_id]).unsqueeze(0)
             target = inputs.clone()
 
             optimizer.zero_grad()
-            output = model(inputs)
+            if betas is not None:
+                beta = betas[question_id]
+                output = model(inputs, beta)
+            else:
+                output = model(inputs)
 
             # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            nan_mask = np.isnan(train_data[:, question_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            regularizer = 0.5 * lamb * model.get_weight_norm()
-            loss = torch.sum((output - target) ** 2.) + regularizer
-            # loss = torch.sum((output - target) ** 2.)
+            # regularizer = 0.5 * lamb * model.get_weight_norm()
+            # loss = torch.sum((output - target) ** 2.) + regularizer
+            loss = torch.sum((output - target) ** 2.)
             loss.backward()
 
             train_loss += loss.item()
             optimizer.step()
 
-            # for part 3 ii d
-            # with torch.no_grad():
-            #     model.eval()
-            #     for i, u in enumerate(valid_data["user_id"]):
-            #         valid_inputs = Variable(zero_train_data[u]).unsqueeze(0)
-            #         valid_output = model(valid_inputs)
-            #         valid_guess = valid_output[0][valid_data["question_id"][i]].item()
-            #         valid_loss += (valid_guess - valid_data["is_correct"][i]) ** 2.
-
-        valid_acc = evaluate(model, zero_train_data, valid_data)
-        # print("Epoch: {} \tTraining Cost: {:.6f}\t "
-        #       "Valid Acc: {}\tValid Cost: {:.6f}".format(epoch, train_loss, valid_acc, valid_loss))
+        valid_acc = evaluate(model, zero_train_data, valid_data, betas)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
-        epoch_list.append(epoch)
-        training_loss_list.append(train_loss)
-        validation_loss_list.append(valid_acc)
 
-    # Plot for Q1d
-    # plt.plot(epoch_list, training_loss_list)
-    # plt.xlabel("epoch number")
-    # plt.ylabel("training objective")
-    # plt.title("epoch vs training objective")
-    # plt.show()
-    #
-    # plt.plot(epoch_list, validation_loss_list)
-    # plt.xlabel("epoch number")
-    # plt.ylabel("validation accuracy")
-    # plt.title("epoch vs validation accuracy")
-    # plt.show()
+    return model
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
 
 
-def evaluate(model, train_data, valid_data):
+def evaluate(model, train_data, valid_data, betas):
     """ Evaluate the valid_data on the current model.
 
     :param model: Module
@@ -182,15 +177,29 @@ def evaluate(model, train_data, valid_data):
     total = 0
     correct = 0
 
-    for i, u in enumerate(valid_data["user_id"]):
-        inputs = Variable(train_data[u]).unsqueeze(0)
-        output = model(inputs)
+    for i, q in enumerate(valid_data["question_id"]):
+        inputs = Variable(train_data[:, q]).unsqueeze(0)
+        if betas is not None:
+            output = model(inputs, betas[q])
+        else:
+            output = model(inputs)
 
-        guess = output[0][valid_data["question_id"][i]].item() >= 0.5
+        guess = output[0][valid_data["user_id"][i]].item() >= 0.5
         if guess == valid_data["is_correct"][i]:
             correct += 1
         total += 1
     return correct / float(total)
+
+
+def get_latent_mat(model, zero_train_data, entity='question'):
+    if entity == 'question':
+        batched_input = torch.t(zero_train_data)
+        batched_latent = model.get_raw_latent(batched_input)
+        latent_mat = torch.t(batched_latent)
+        breakpoint()
+        return latent_mat.detach().numpy()
+
+
 
 
 def main():
@@ -200,76 +209,42 @@ def main():
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
-    # Set model hyperparameters.
-    k_list = [10, 50, 100, 200, 500]
-    lr_list = [0.001, 0.01, 0.1, 1]
-    epoch_list = [3, 5, 10, 15]
-    valid_accuracy_list = []
+    # Pre-train IRT model
+    _, betas, _, _, _ = \
+        item_response.irt(
+        data=train_matrix.detach().numpy(),
+        val_data=valid_data,
+        lr=0.01,
+        iterations=25,
+    )
 
+    # betas = (betas - 0.5) * 2  # TODO Ways to tune this??
+
+    # Set model hyperparameters.
+    k_list = [10, 50, 100, 200]  # 10, 50, 100, 200
+    lr_list = [0.001, 0.01, 0.1, 1]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [3, 5, 10, 15]  # 3, 5, 10, 15
+    test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
-    best_valid_accuracy_so_far = 0
+    best_test_accuracy_so_far = 0
     best_parameters = []
     for k in k_list:
         for lr in lr_list:
             for num_epoch in epoch_list:
-                model = AutoEncoder(train_matrix.shape[1], k)
+                model = AutoEncoder(train_matrix.shape[0], k, 1)
                 train(model, lr, lamb, train_matrix, zero_train_matrix,
-                      valid_data, num_epoch)
-                valid_accuracy = evaluate(model, zero_train_matrix, valid_data)
-                if valid_accuracy > best_valid_accuracy_so_far:
-                    best_valid_accuracy_so_far = valid_accuracy
+                      valid_data, num_epoch, betas)
+                test_accuracy = evaluate(model, zero_train_matrix, test_data, betas)
+                if test_accuracy > best_test_accuracy_so_far:
+                    best_test_accuracy_so_far = test_accuracy
                     best_parameters = [k, lr, num_epoch]
-                valid_accuracy_list.append(valid_accuracy)
+                test_accuracy_list.append(test_accuracy)
                 print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
-                               " valid accuracy = " + str(valid_accuracy)
+                               " test accuracy = " + str(test_accuracy)
                 print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " valid accuracy = ", best_valid_accuracy_so_far)
-
-    # Q3, ii, d
-    lamb = 0.001
-    k = 10
-    lr = 0.1
-    num_epoch = 10
-
-    model = AutoEncoder(train_matrix.shape[1], k)
-    train(model, lr, lamb, train_matrix, zero_train_matrix,
-          valid_data, num_epoch)
-    test_accuracy = evaluate(model, zero_train_matrix, test_data)
-    test_accuracy_list.append(test_accuracy)
-    print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
-                   " test accuracy = " + str(test_accuracy)
-    print(print_string)
-
-
-    # Q3, ii, e
-    k = 10
-    lr = 0.1
-    num_epoch = 10
-    lambda_list = [0.001, 0.01, 0.1, 1]
-    accuracy_list = []
-    best_test_accuracy_so_far = 0
-    best_parameters = 0
-    for lamb in lambda_list:
-        model = AutoEncoder(train_matrix.shape[1], k)
-        train(model, lr, lamb, train_matrix, zero_train_matrix,
-              valid_data, num_epoch)
-        test_accuracy = evaluate(model, zero_train_matrix, test_data)
-        if test_accuracy > best_test_accuracy_so_far:
-            best_test_accuracy_so_far = test_accuracy
-            best_parameters = lamb
-        test_accuracy_list.append(test_accuracy)
-        accuracy_list.append(test_accuracy)
-        print_string = "lambda = " + str(lamb) + " test accuracy = " + str(test_accuracy)
-        print(print_string)
-    print("best lambda is "  + str(best_parameters) + " best accuracy is "  + str(best_test_accuracy_so_far))
-
-    plt.plot(lambda_list, accuracy_list)
-    plt.xlabel("lambda")
-    plt.ylabel("test accuracy")
-    plt.title("lambda vs test accuracy")
-    plt.show()
+          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", best_test_accuracy_so_far)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
