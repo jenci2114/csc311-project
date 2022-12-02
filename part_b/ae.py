@@ -212,7 +212,7 @@ def main():
         iterations=25,
     )
 
-    # betas = (betas - 0.5) * 2  # TODO Ways to tune this??
+    betas = (betas - 0.5) * 2  # TODO Ways to tune this??
 
     # Set model hyperparameters.
     k_list = [50]  # 10, 50, 100, 200
