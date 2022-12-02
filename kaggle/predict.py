@@ -76,20 +76,47 @@ if __name__ == '__main__':
         iterations=25
     )
 
-    k = 50
-    model = AutoEncoder(train_matrix.shape[0], k, 1)
-    hyper = {
-        'lr': 0.01,
-        'lamb': 0.001,
-        'train_data': train_matrix,
-        'zero_train_data': zero_train_matrix,
-        'valid_data': valid_data,
-        'num_epoch': 15,
-        'betas': betas,
-    }
-    evaluation = {
-        'train_data': zero_train_matrix,
-        'valid_data': test_data,
-        'betas': betas,
-    }
-    generate_prediction(model, 'predictions/ae.csv', hyper, evaluation)
+    betas = (betas - 0.5) * 2
+
+    ks = [10]
+    lrs = [0.002]
+    epochs = [30, 50, 100]
+
+    for k in ks:
+        for lr in lrs:
+            for epoch in epochs:
+                model = AutoEncoder(train_matrix.shape[0], k, 1)
+                hyper = {
+                    'lr': lr,
+                    'lamb': 0.001,
+                    'train_data': train_matrix,
+                    'zero_train_data': zero_train_matrix,
+                    'valid_data': valid_data,
+                    'num_epoch': epoch,
+                    'betas': betas,
+                }
+                evaluation = {
+                    'train_data': zero_train_matrix,
+                    'valid_data': test_data,
+                    'betas': betas,
+                }
+                print(f"Starting: k={k}, lr={lr}, epoch={epoch}")
+                generate_prediction(model, f'predictions/ae_mod_{k}_{lr}_{epoch}.csv', hyper, evaluation)
+
+    # k = 50
+    # model = AutoEncoder(train_matrix.shape[0], k, 1)
+    # hyper = {
+    #     'lr': 0.01,
+    #     'lamb': 0.001,
+    #     'train_data': train_matrix,
+    #     'zero_train_data': zero_train_matrix,
+    #     'valid_data': valid_data,
+    #     'num_epoch': 15,
+    #     'betas': betas,
+    # }
+    # evaluation = {
+    #     'train_data': zero_train_matrix,
+    #     'valid_data': test_data,
+    #     'betas': betas,
+    # }
+    # generate_prediction(model, 'predictions/ae.csv', hyper, evaluation)
