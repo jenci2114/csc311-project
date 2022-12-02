@@ -220,9 +220,9 @@ def main():
     # betas = (betas - 0.5) * 2  # TODO Ways to tune this??
 
     # Set model hyperparameters.
-    k_list = [10, 50, 100, 200]  # 10, 50, 100, 200
-    lr_list = [0.001, 0.01, 0.1, 1]  # 0.001, 0.01, 0.1, 1
-    epoch_list = [3, 5, 10, 15]  # 3, 5, 10, 15
+    k_list = [100]  # 10, 50, 100, 200
+    lr_list = [0.001]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [3]  # 3, 5, 10, 15
     test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
