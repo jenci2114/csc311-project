@@ -109,10 +109,10 @@ def nn_train_predict(train_data: dict, full_shape: tuple, test_data: dict) -> li
     zero_train_matrix = torch.FloatTensor(zero_train_matrix)
     train_matrix = torch.FloatTensor(train_matrix)
     # create neural network model and train it
-    k = 100
+    k = 10
     learning_rate = 0.1
-    num_epoch = 5
-    lamb = 0.01
+    num_epoch = 10
+    lamb = 0.001
     nn_model = AutoEncoder(train_matrix.shape[1], k)
     nn_model.train()
     train(nn_model, learning_rate, lamb, train_matrix, zero_train_matrix,
@@ -163,15 +163,15 @@ if __name__ == "__main__":
     acc = ensemble_evaluate(prediction1, prediction2, prediction3, weight, val_data)
     print(f"Ensemble accuracy: {acc}")
 
-    valid_prediction1 = knn_train_predict(train_data, val_data, train_shape)
-    valid_prediction2 = irt_train_test(train_data, val_data)
-    valid_prediction3 = nn_train_predict(train_data, train_shape, val_data)
-    valid_acc = ensemble_evaluate(valid_prediction1, valid_prediction2, valid_prediction3, weight, val_data)
-    print(f"Ensemble accuracy on valid set: {valid_acc}")
+    # valid_prediction1 = knn_train_predict(train_data, val_data, train_shape)
+    # valid_prediction2 = irt_train_test(train_data, val_data)
+    # valid_prediction3 = nn_train_predict(train_data, train_shape, val_data)
+    # valid_acc = ensemble_evaluate(valid_prediction1, valid_prediction2, valid_prediction3, weight, val_data)
+    # print(f"Ensemble accuracy on valid set: {valid_acc}")
 
-    test_prediction1 = knn_train_predict(train_data, test_data, train_shape)
-    test_prediction2 = irt_train_test(train_data, test_data)
-    test_prediction3 = nn_train_predict(train_data, train_shape, test_data)
+    test_prediction1 = knn_train_predict(dataset_1, test_data, train_shape)
+    test_prediction2 = irt_train_test(dataset_2, test_data)
+    test_prediction3 = nn_train_predict(dataset_3, train_shape, test_data)
     test_acc = ensemble_evaluate(test_prediction1, test_prediction2, test_prediction3, weight, test_data)
 
     print(f"Ensemble accuracy on test set: {test_acc}")
