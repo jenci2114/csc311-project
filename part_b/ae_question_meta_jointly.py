@@ -13,7 +13,7 @@ import torch
 
 import math
 from torch import sigmoid
-import item_response
+from part_a import item_response
 from meta_process import process_question_meta, get_subject_number
 
 
