@@ -15,12 +15,12 @@ def process_student_meta(filepath: str) -> dict:
     student_birthdate = student_meta['data_of_birth'].values  # birthdate array
     existing_ages = []
     for i in range(len(student_birthdate)):
-        if not pd.isnull(student_birthdate[i]):
+        if not pd.isnull(student_birthdate[i]) and int(student_birthdate[i][:4]) < 2022:
             existing_ages.append(2022 - int(student_birthdate[i][:4]))
     mean_age = np.mean(existing_ages)
     student_age = []  # age array
     for i in range(len(student_birthdate)):
-        if pd.isnull(student_birthdate[i]):
+        if pd.isnull(student_birthdate[i]) or int(student_birthdate[i][:4]) >= 2022:
             student_age.append(mean_age)
         else:
             student_age.append(2022 - int(student_birthdate[i][:4]))
