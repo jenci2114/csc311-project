@@ -86,17 +86,21 @@ class AutoEncoder(nn.Module):
         :return: user vector.
         """
         # Forward question entity
+        inputs = inputs
         question_raw_latent = sigmoid(self.g(inputs))
 
         # Beta appending depends on whether beta is given
         if beta is not None:
             question_latent = torch.cat(
-                    (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
+                    (question_raw_latent, 
+                    torch.tensor([[beta]], dtype=torch.float32).cuda()), 
+                    axis=-1) # TODO more modulerized
         else:
             question_latent = question_raw_latent
 
         # Forward question meta
         if meta is not None:
+            meta = meta.cuda()
             subject_latent = sigmoid(self.subject_enc_linear(meta))
             question_full_latent = torch.cat(
                                     (question_latent, subject_latent),
@@ -142,7 +146,7 @@ def train(
         train_loss = 0.
 
         for question_id in range(num_question):
-            inputs = Variable(zero_train_data[:, question_id]).unsqueeze(0)
+            inputs = Variable(zero_train_data[:, question_id]).unsqueeze(0).cuda()
             target = inputs.clone()
 
             optimizer.zero_grad()
@@ -197,7 +201,7 @@ def evaluate(model, train_data, valid_data, betas=None, metas=None):
     correct = 0
 
     for i, q in enumerate(valid_data["question_id"]):
-        inputs = Variable(train_data[:, q]).unsqueeze(0)
+        inputs = Variable(train_data[:, q]).unsqueeze(0).cuda()
 
         if betas is not None:
             beta = betas[q]
@@ -267,39 +271,40 @@ def main():
 
     # Set model hyperparameters.
     # meta_latent_dim = 5
-    meta_latent_dim_list = [2, 3, 4, 5]
+    meta_latent_dim_list = [2, 3, 4, 5, 6, 7]
     k_list = [10, 15, 20, 30]  # 10, 50, 100, 200
-    lr_list = [0.01, 0.05
-               ]  # 0.001, 0.01, 0.1, 1
-    epoch_list = [3, 5, 10, 15]  # 3, 5, 10, 15
+    lr_list = [0.01, 0.05, 0.1]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [3, 5, 10, 15, 20, 30]  # 3, 5, 10, 15
+    lambda_list = [0.001, 0.01, 0.1]
     test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
-    lamb = 0.001
     best_test_accuracy_so_far = 0
     best_parameters = []
-    for meta_latent_dim in meta_latent_dim_list:
-        for k in k_list:
-            for lr in lr_list:
-                for num_epoch in epoch_list:
-                    model = AutoEncoder(
-                        num_students=train_matrix.shape[0],
-                        num_subjects=subject_count,
-                        question_latent_dim=k,
-                        subject_latent_dim=meta_latent_dim,
-                        extra_latent_dim=1 if betas is not None else 0,
-                        )
-                    train(model, lr, lamb, train_matrix, zero_train_matrix,
-                          valid_data, num_epoch, betas=betas, metas=raw_question_meta)
-                    test_accuracy = evaluate(model, zero_train_matrix, test_data, betas=betas, metas=raw_question_meta)
-                    if test_accuracy > best_test_accuracy_so_far:
-                        best_test_accuracy_so_far = test_accuracy
-                        best_parameters = [k, lr, num_epoch, meta_latent_dim]
-                    test_accuracy_list.append(test_accuracy)
-                    print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
-                                   " test accuracy = " + str(test_accuracy) + " meta_latent_dim = " + str(meta_latent_dim)
-                    print(print_string)
+    for lamb in lambda_list:
+        for meta_latent_dim in meta_latent_dim_list:
+            for k in k_list:
+                for lr in lr_list:
+                    for num_epoch in epoch_list:
+                        model = AutoEncoder(
+                            num_students=train_matrix.shape[0],
+                            num_subjects=subject_count,
+                            question_latent_dim=k,
+                            subject_latent_dim=meta_latent_dim,
+                            extra_latent_dim=1 if betas is not None else 0,
+                            ).cuda()
+                        train(model, lr, lamb, train_matrix, zero_train_matrix,
+                            valid_data, num_epoch, betas=betas, metas=raw_question_meta)
+                        test_accuracy = evaluate(model, zero_train_matrix, test_data, betas=betas, metas=raw_question_meta)
+                        if test_accuracy > best_test_accuracy_so_far:
+                            best_test_accuracy_so_far = test_accuracy
+                            best_parameters = [k, lr, num_epoch, meta_latent_dim, lamb]
+                        test_accuracy_list.append(test_accuracy)
+                        print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
+                                    " test accuracy = " + str(test_accuracy) + " meta_latent_dim = " + str(meta_latent_dim)
+                        print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " meta_latent_dim = " + str(best_parameters[3]) +" best test accuracy is: " + str(best_test_accuracy_so_far))
+          " epoch = " + str(best_parameters[2]) + " meta_latent_dim = " + str(best_parameters[3]) + " best test accuracy is: " + str(best_test_accuracy_so_far +\
+            "lambda =" + str(best_parameters[4])))
 
 
 
