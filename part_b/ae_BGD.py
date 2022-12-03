@@ -17,6 +17,17 @@ import item_response
 from torch.utils.data import DataLoader, Dataset, random_split
 
 
+def read_encoded_question_metadata(filepath, question_num, k):
+    """Read the encoded question metadata from <filepath>."""
+    res = np.zeros((question_num, k))
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f)
+        next(reader)
+        for row in reader:
+            q_id = int(row[0])
+            res[q_id] = np.array(row[1:]).astype(float)
+    return res
+
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
 
@@ -45,7 +56,7 @@ def load_data(base_path="../data"):
 
 
 class AEDataset(Dataset):
-    def __init__(self, zero_train_matrix, beta_vector) -> None:
+    def __init__(self, zero_train_matrix, beta_vector, metadata) -> None:
         """
         args:
             - zero_train_matrix: table with nan replaced by 0.
@@ -53,6 +64,7 @@ class AEDataset(Dataset):
         super().__init__()
         self.zero_train_matrix = zero_train_matrix
         self.beta_vector = beta_vector
+        self.metadata = metadata
         
         
     def __len__(self):
@@ -65,8 +77,10 @@ class AEDataset(Dataset):
         """
         return {'question_id': idx,
                 'question_vector': self.zero_train_matrix[:, idx],
-                'beta': torch.tensor(self.beta_vector[idx], dtype=torch.float32) 
-                        if self.beta_vector is not None else torch.nan
+                'beta': torch.tensor([self.beta_vector[idx]], dtype=torch.float32) 
+                        if self.beta_vector is not None else torch.nan,
+                'meta_latent': self.metadata[idx] 
+                        if self.metadata is not None else torch.nan
                 }
     
     
@@ -95,7 +109,7 @@ class AutoEncoder(nn.Module):
     def get_raw_latent(self, inputs):
         return sigmoid(self.g(inputs))
 
-    def forward(self, inputs, beta=None):
+    def forward(self, inputs, beta=None, meta=None):
         """ Return a forward pass given inputs.
 
         :param inputs: user vector.
@@ -105,11 +119,14 @@ class AutoEncoder(nn.Module):
         if beta is not None:
             # question_latent = torch.cat(
             #         (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
-            beta = beta.reshape(-1, 1)
-
+            # beta = beta.reshape(-1, 1)
             question_latent = torch.cat((question_raw_latent, beta), axis=-1)
         else:
             question_latent = question_raw_latent
+        
+        if meta is not None:
+            question_latent = torch.cat((question_latent, meta), axis=-1)
+        
         decoded = sigmoid(self.h(question_latent))
         return decoded
 
@@ -123,7 +140,8 @@ def train(
     zero_train_data,
     valid_data,
     num_epoch,
-    betas
+    betas,
+    metadata
     ):
     """ Train the neural network, where the objective also includes
     a regularizer.
@@ -142,7 +160,11 @@ def train(
     model.train()
     
     # Build dataset object
-    dataset = AEDataset(zero_train_matrix=zero_train_data, beta_vector=betas)
+    dataset = AEDataset(
+        zero_train_matrix=zero_train_data, 
+        beta_vector=betas,
+        metadata=metadata
+        )
     
     # Define dataloader 
     dataloarder = DataLoader(
@@ -165,6 +187,7 @@ def train(
             question_id_batch = datapoints['question_id']
             question_vectors_batch = datapoints['question_vector']
             beta_batch = datapoints['beta']
+            meta_batch = datapoints['meta_latent']
             
             inputs = Variable(question_vectors_batch)   # TODO: need Variable()?
             targets = inputs.clone()
@@ -176,11 +199,10 @@ def train(
             # else:
             #     output = model(inputs)
             
-
-            
             outputs = model(
                         inputs, 
-                        beta=beta_batch if not torch.isnan(beta_batch[0]).item() else None
+                        beta=beta_batch if not torch.isnan(beta_batch.flatten()[0]).item() else None,
+                        meta=meta_batch if not torch.isnan(meta_batch.flatten()[0]).item() else None,
                         )
 
             # Mask the target to only compute the gradient of valid entries.
@@ -198,7 +220,7 @@ def train(
             train_loss += loss.item()
             optimizer.step()
 
-        valid_acc = evaluate(model, zero_train_data, valid_data, betas)
+        valid_acc = evaluate(model, zero_train_data, valid_data, betas, metadata)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
 
@@ -208,7 +230,7 @@ def train(
     #####################################################################
 
 
-def evaluate(model, train_data, valid_data, betas):
+def evaluate(model, train_data, valid_data, betas, metadata):
     """ Evaluate the valid_data on the current model.
 
     :param model: Module
@@ -225,10 +247,23 @@ def evaluate(model, train_data, valid_data, betas):
 
     for i, q in enumerate(valid_data["question_id"]):
         inputs = Variable(train_data[:, q]).unsqueeze(0)
-        if betas is not None:
-            output = model(inputs, torch.tensor(betas[q], dtype=torch.float32))
-        else:
-            output = model(inputs)
+        # if betas is not None:
+        #     betas = torch.tensor([betas[q]], dtype=torch.float32)
+        # else:
+        #     betas = None
+        
+        # output = model(inputs, betas)
+        # if metadata is not None:
+        #     output = model(inputs, torch.tensor(metadata[q], dtype=torch.float32))
+        
+        
+        # output = model(inputs, betas=betas, metadata=metadata)
+        output = model(
+            inputs=inputs,
+            beta=torch.tensor([[betas[q]]], dtype=torch.float32) if betas is not None else None,
+            meta=metadata[q].unsqueeze(0) if metadata is not None else None
+        )
+
 
         guess = output[0][valid_data["user_id"][i]].item() >= 0.5
         if guess == valid_data["is_correct"][i]:
@@ -264,26 +299,35 @@ def main():
         iterations=25,
     )
 
+    question_num = train_matrix.shape[1]
+    k_meta = 5
+    metadata = read_encoded_question_metadata('../data/question_meta_encoded.csv', question_num, k_meta)
+    metadata = torch.tensor(metadata, dtype=torch.float32)
+
+    
     # betas = None
-    batch_sizes = [5, 10, 30, 80]
+    batch_sizes = [5, 10, 30]
 
     # Set model hyperparameters.
     k_list = [3, 5, 8, 10]  # 10, 50, 100, 200
-    lr_list = [1e-3]  # 0.001, 0.01, 0.1, 1
-    epoch_list = [3, 5, 10, 15, 20]  # 3, 5, 10, 15
+    lr_list = [1e-2, 1e-3, 1e-4]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [3, 5, 10, 15, 20, 25]  # 3, 5, 10, 15
     test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0
     best_test_accuracy_so_far = 0
-    best_parameters = []
+    best_hp = {}
     for batch_size in batch_sizes:
         for k in k_list:
             for lr in lr_list:
                 for num_epoch in epoch_list:
+                    extra_latent_dim = 1 if betas is not None else 0
+                    extra_latent_dim += 5 if metadata is not None else 0
                     model = AutoEncoder(
                         train_matrix.shape[0], 
                         k, 
-                        extra_latent_dim=0 if betas is None else 1)
+                        extra_latent_dim=extra_latent_dim)
+                    
                     train(
                         model, 
                         lr, 
@@ -293,18 +337,30 @@ def main():
                         zero_train_matrix,
                         valid_data, 
                         num_epoch, 
-                        betas
+                        betas,
+                        metadata
                         )
-                    test_accuracy = evaluate(model, zero_train_matrix, test_data, betas)
+                    test_accuracy = evaluate(model, zero_train_matrix, test_data, betas, metadata)
                     if test_accuracy > best_test_accuracy_so_far:
                         best_test_accuracy_so_far = test_accuracy
-                        best_parameters = [k, lr, num_epoch]
+                        best_hp = {
+                                    'k': k, 
+                                    'bs': batch_size,
+                                    'lr': lr,
+                                   'epoch': num_epoch
+                                   } 
                     test_accuracy_list.append(test_accuracy)
-                    print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
-                                " test accuracy = " + str(test_accuracy)
-                    print(print_string)
-    print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", best_test_accuracy_so_far)
+                    # print_string = \
+                    #             "k = " + str(k) + \
+                    #             ",   batch_size = {batch_size}",
+                    #             ",   lr = " + str(lr) + \
+                    #             ",   epoch = " + str(num_epoch) + \
+                    #             ",   test accuracy = " + str(test_accuracy)
+                    # print(print_string)
+                    print(f"k = {k},  bs = {batch_size},  lr = {lr},  epoch = {num_epoch},  test_accuracy = {test_accuracy}")
+                    # dict = {'k': k, 'bs': batch_size, 'lr': lr, 'num_epoch': num_epoch, 'test_accuracy': test_accuracy}
+                    # print(dict)
+    print(f"Best parameters: k = {best_hp['k']},  bs = {best_hp['bs']},  lr = {best_hp['lr']},  epoch = {best_hp['num_epoch']},  best test accuracy is = {best_test_accuracy_so_far}" )
     # plt.plot(k_list, test_accuracy_list)
     # plt.xlabel("k value")
     # plt.ylabel("test accuracy")
