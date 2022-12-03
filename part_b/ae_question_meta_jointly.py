@@ -47,11 +47,11 @@ def load_data(base_path="../data"):
 
 class AutoEncoder(nn.Module):
     def __init__(
-        self, 
-        num_students, 
-        num_subjects, 
-        question_latent_dim=10, 
-        subject_latent_dim=5, 
+        self,
+        num_students,
+        num_subjects,
+        question_latent_dim=10,
+        subject_latent_dim=5,
         extra_latent_dim=0
         ):
         """ Initialize a class AutoEncoder.
@@ -64,7 +64,7 @@ class AutoEncoder(nn.Module):
         # Define linear functions.
         self.g = nn.Linear(num_students, question_latent_dim)
         self.h = nn.Linear(question_latent_dim + subject_latent_dim + extra_latent_dim, num_students)
-        
+
         self.subject_enc_linear = nn.Linear(num_subjects, subject_latent_dim)
 
     def get_weight_norm(self):
@@ -87,22 +87,22 @@ class AutoEncoder(nn.Module):
         """
         # Forward question entity
         question_raw_latent = sigmoid(self.g(inputs))
-        
+
         # Beta appending depends on whether beta is given
         if beta is not None:
             question_latent = torch.cat(
                     (question_raw_latent, torch.tensor([[beta]], dtype=torch.float32)), axis=-1) # TODO more modulerized
         else:
             question_latent = question_raw_latent
-            
-        # Forward question meta 
+
+        # Forward question meta
         if meta is not None:
             subject_latent = sigmoid(self.subject_enc_linear(meta))
             question_full_latent = torch.cat(
-                                    (question_latent, subject_latent), 
+                                    (question_latent, subject_latent),
                                     axis=-1
                                     )
-        
+
         decoded = sigmoid(self.h(question_full_latent))
         return decoded
 
@@ -257,46 +257,49 @@ def main():
 
     # betas = (betas - 0.5) * 2  # TODO Ways to tune this??
     # betas = None
-    
+
     # Load raw question metadata
     data = load_train_csv('../data')
     question_count = max(data['question_id']) + 1
     subject_count = get_subject_number('../data/subject_meta.csv')
     raw_question_meta = process_question_meta('../data/question_meta.csv', question_count, subject_count)
     raw_question_meta = torch.FloatTensor(raw_question_meta)
-    meta_latent_dim = 5
 
     # Set model hyperparameters.
-    k_list = [10, 20, 50]  # 10, 50, 100, 200
-    lr_list = [0.01]  # 0.001, 0.01, 0.1, 1
-    epoch_list = [3, 5, 10, 15, 20, 25]  # 3, 5, 10, 15
+    # meta_latent_dim = 5
+    meta_latent_dim_list = [2, 3, 4, 5]
+    k_list = [10, 15, 20, 30]  # 10, 50, 100, 200
+    lr_list = [0.01, 0.05
+               ]  # 0.001, 0.01, 0.1, 1
+    epoch_list = [3, 5, 10, 15]  # 3, 5, 10, 15
     test_accuracy_list = []
     # Q3, ii, c, tune k, learning rate, and number of epoch
     lamb = 0.001
     best_test_accuracy_so_far = 0
     best_parameters = []
-    for k in k_list:
-        for lr in lr_list:
-            for num_epoch in epoch_list:
-                model = AutoEncoder(
-                    num_students=train_matrix.shape[0], 
-                    num_subjects=subject_count,
-                    question_latent_dim=k,
-                    subject_latent_dim=meta_latent_dim,
-                    extra_latent_dim=1 if betas is not None else 0,
-                    )
-                train(model, lr, lamb, train_matrix, zero_train_matrix,
-                      valid_data, num_epoch, betas=betas, metas=raw_question_meta)
-                test_accuracy = evaluate(model, zero_train_matrix, test_data, betas=betas, metas=raw_question_meta)
-                if test_accuracy > best_test_accuracy_so_far:
-                    best_test_accuracy_so_far = test_accuracy
-                    best_parameters = [k, lr, num_epoch]
-                test_accuracy_list.append(test_accuracy)
-                print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
-                               " test accuracy = " + str(test_accuracy)
-                print(print_string)
+    for meta_latent_dim in meta_latent_dim_list:
+        for k in k_list:
+            for lr in lr_list:
+                for num_epoch in epoch_list:
+                    model = AutoEncoder(
+                        num_students=train_matrix.shape[0],
+                        num_subjects=subject_count,
+                        question_latent_dim=k,
+                        subject_latent_dim=meta_latent_dim,
+                        extra_latent_dim=1 if betas is not None else 0,
+                        )
+                    train(model, lr, lamb, train_matrix, zero_train_matrix,
+                          valid_data, num_epoch, betas=betas, metas=raw_question_meta)
+                    test_accuracy = evaluate(model, zero_train_matrix, test_data, betas=betas, metas=raw_question_meta)
+                    if test_accuracy > best_test_accuracy_so_far:
+                        best_test_accuracy_so_far = test_accuracy
+                        best_parameters = [k, lr, num_epoch, meta_latent_dim]
+                    test_accuracy_list.append(test_accuracy)
+                    print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
+                                   " test accuracy = " + str(test_accuracy) + " meta_latent_dim = " + str(meta_latent_dim)
+                    print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", best_test_accuracy_so_far)
+          " epoch = " + str(best_parameters[2]) + " meta_latent_dim = " + str(best_parameters[3]) +" best test accuracy is: " + str(best_test_accuracy_so_far))
 
 
 
@@ -305,7 +308,7 @@ def main():
 if __name__ == '__main__':
     # data = load_train_csv('../data')
     # question_count = max(data['question_id']) + 1
-    
+
 
     # k = 5
     # lr = 0.1
@@ -316,5 +319,5 @@ if __name__ == '__main__':
     # # reconstructed_meta = assess_result(model, question_meta, subject_count)
     torch.manual_seed(2002)
     main()
-    
-    
+
+

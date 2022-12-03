@@ -243,7 +243,7 @@ def main():
                                " test accuracy = " + str(test_accuracy)
                 print(print_string)
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
-          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", best_test_accuracy_so_far)
+          " epoch = " + str(best_parameters[2]) + " best test accuracy is: ", str(best_test_accuracy_so_far))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
