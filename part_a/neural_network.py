@@ -252,7 +252,7 @@ def main():
     lamb = 0.001
     k = 10
     lr = 0.1
-    num_epoch = 10
+    num_epoch = 15
 
     model = AutoEncoder(train_matrix.shape[1], k)
     train(model, lr, lamb, train_matrix, zero_train_matrix,
@@ -266,7 +266,7 @@ def main():
     # Q3, ii, e
     k = 10
     lr = 0.1
-    num_epoch = 10
+    num_epoch = 15
     lambda_list = [0.001, 0.01, 0.1, 1]
     accuracy_list = []
     best_test_accuracy_so_far = 0
@@ -306,5 +306,5 @@ def main():
 
 
 if __name__ == "__main__":
-    torch.manual_seed(2000)
+    torch.manual_seed(2023)
     main()
