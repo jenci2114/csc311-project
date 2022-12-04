@@ -106,7 +106,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     # the three lists below are used to plot
     epoch_list = []
     training_loss_list = []
-    validation_loss_list = []
+    validation_accuracy_list = []
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
@@ -133,6 +133,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             optimizer.step()
 
             # for part 3 ii d
+            # It compute validation objective. But according to Piazza we should plot valid accuracy
+            # So I comment the code below
             # with torch.no_grad():
             #     model.eval()
             #     for i, u in enumerate(valid_data["user_id"]):
@@ -142,22 +144,20 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             #         valid_loss += (valid_guess - valid_data["is_correct"][i]) ** 2.
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
-        # print("Epoch: {} \tTraining Cost: {:.6f}\t "
-        #       "Valid Acc: {}\tValid Cost: {:.6f}".format(epoch, train_loss, valid_acc, valid_loss))
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
         epoch_list.append(epoch)
         training_loss_list.append(train_loss)
-        validation_loss_list.append(valid_acc)
+        validation_accuracy_list.append(valid_acc)
 
-    # Plot for Q1d
+    # Plot for Q3d
     # plt.plot(epoch_list, training_loss_list)
     # plt.xlabel("epoch number")
-    # plt.ylabel("training objective")
-    # plt.title("epoch vs training objective")
+    # plt.ylabel("training loss")
+    # plt.title("epoch vs training loss")
     # plt.show()
     #
-    # plt.plot(epoch_list, validation_loss_list)
+    # plt.plot(epoch_list, validation_accuracy_list)
     # plt.xlabel("epoch number")
     # plt.ylabel("validation accuracy")
     # plt.title("epoch vs validation accuracy")
@@ -207,6 +207,7 @@ def main():
     valid_accuracy_list = []
 
     # Q3, ii, c, tune k, learning rate, and number of epoch
+    # Don't forget to remove the regularizer before running Q3 ii c
     lamb = 0.001
     best_valid_accuracy_so_far = 0
     best_parameters = []
@@ -227,7 +228,27 @@ def main():
     print("the best parameters I got is: k = " + str(best_parameters[0]) + " learning rate = " + str(best_parameters[1]) + \
           " epoch = " + str(best_parameters[2]) + " valid accuracy = ", best_valid_accuracy_so_far)
 
+    valid_accuracy_for_k = []
+    k_list = [10, 50, 100, 200, 500]
+    lr = 0.1
+    num_epoch = 15
+    lamb = 0.001
+    for k in k_list:
+        model = AutoEncoder(train_matrix.shape[1], k)
+        train(model, lr, lamb, train_matrix, zero_train_matrix,
+              valid_data, num_epoch)
+        valid_accuracy = evaluate(model, zero_train_matrix, valid_data)
+        valid_accuracy_for_k.append(valid_accuracy)
+    plt.plot(k_list, valid_accuracy_for_k)
+    plt.xlabel("k")
+    plt.ylabel("validation accuracy")
+    plt.title("k vs validation accuracy")
+    plt.show()
+
+    print("lambda list is ", k_list, ", accuracy list is ", valid_accuracy_for_k)
+
     # Q3, ii, d
+    # Don't forget to remove the regularizer before running Q3 ii d
     lamb = 0.001
     k = 10
     lr = 0.1
@@ -237,7 +258,6 @@ def main():
     train(model, lr, lamb, train_matrix, zero_train_matrix,
           valid_data, num_epoch)
     test_accuracy = evaluate(model, zero_train_matrix, test_data)
-    test_accuracy_list.append(test_accuracy)
     print_string = "k = " + str(k) + " lr = " + str(lr) + " epoch = " + str(num_epoch) + \
                    " test accuracy = " + str(test_accuracy)
     print(print_string)
@@ -255,25 +275,36 @@ def main():
         model = AutoEncoder(train_matrix.shape[1], k)
         train(model, lr, lamb, train_matrix, zero_train_matrix,
               valid_data, num_epoch)
-        test_accuracy = evaluate(model, zero_train_matrix, test_data)
-        if test_accuracy > best_test_accuracy_so_far:
-            best_test_accuracy_so_far = test_accuracy
+        valid_accuracy = evaluate(model, zero_train_matrix, valid_data)
+        if valid_accuracy > best_test_accuracy_so_far:
+            best_test_accuracy_so_far = valid_accuracy
             best_parameters = lamb
-        test_accuracy_list.append(test_accuracy)
-        accuracy_list.append(test_accuracy)
-        print_string = "lambda = " + str(lamb) + " test accuracy = " + str(test_accuracy)
+        accuracy_list.append(valid_accuracy)
+        print_string = "lambda = " + str(lamb) + " test accuracy = " + str(valid_accuracy)
         print(print_string)
     print("best lambda is "  + str(best_parameters) + " best accuracy is "  + str(best_test_accuracy_so_far))
 
+    lamb = best_parameters
+    model = AutoEncoder(train_matrix.shape[1], k)
+    train(model, lr, lamb, train_matrix, zero_train_matrix,
+          valid_data, num_epoch)
+    final_valid_accuracy = evaluate(model, zero_train_matrix, valid_data)
+    final_test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print("With our chosen lambda, the validation accuracy is ", str(final_valid_accuracy), ", the test accuracy is ",
+          str(final_test_accuracy))
+
     plt.plot(lambda_list, accuracy_list)
     plt.xlabel("lambda")
-    plt.ylabel("test accuracy")
-    plt.title("lambda vs test accuracy")
+    plt.ylabel("validation accuracy")
+    plt.title("lambda vs validation accuracy")
     plt.show()
+
+    print("lambda list is ", lambda_list, ", accuracy list is ", accuracy_list)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
 
 
 if __name__ == "__main__":
+    torch.manual_seed(2000)
     main()
