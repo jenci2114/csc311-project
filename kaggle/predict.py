@@ -3,39 +3,12 @@ This module generates files that can be used to submit
 to the CSC311 Kaggle competition.
 """
 from part_a.item_response import irt
-from part_b.ae_question_inject_meta import AutoEncoder, train, evaluate, read_encoded_question_metadata
+from part_b.ae_BGD import AutoEncoder, train, evaluate, read_encoded_question_metadata, load_data
 from utils import load_train_sparse, load_valid_csv, load_public_test_csv, \
     load_private_test_csv, save_private_test_csv
 import torch
 from torch.autograd import Variable
 import numpy as np
-
-
-def load_data(base_path="../data"):
-    """ Load the data in PyTorch Tensor.
-
-    :return: (zero_train_matrix, train_data, valid_data, test_data)
-        WHERE:
-        zero_train_matrix: 2D sparse matrix where missing entries are
-        filled with 0.
-        train_data: 2D sparse matrix
-        valid_data: A dictionary {user_id: list,
-        user_id: list, is_correct: list}
-        test_data: A dictionary {user_id: list,
-        user_id: list, is_correct: list}
-    """
-    train_matrix = load_train_sparse(base_path).toarray()
-    valid_data = load_valid_csv(base_path)
-    test_data = load_public_test_csv(base_path)
-
-    zero_train_matrix = train_matrix.copy()
-    # Fill in the missing entries to 0.
-    zero_train_matrix[np.isnan(train_matrix)] = 0
-    # Change to Float Tensor for PyTorch.
-    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
-    train_matrix = torch.FloatTensor(train_matrix)
-
-    return zero_train_matrix, train_matrix, valid_data, test_data
 
 
 def generate_prediction(model, out_path, hyper, evaluation=None):
@@ -50,17 +23,17 @@ def generate_prediction(model, out_path, hyper, evaluation=None):
 
     private_test = load_private_test_csv('../data')
     predictions = []
-    train_data = hyper['zero_train_data']
+    train_data = hyper['prior_train_data']
     for i, q in enumerate(private_test['question_id']):
         inputs = Variable(train_data[:, q]).unsqueeze(0)
 
         if 'betas' in hyper:
-            beta = hyper['betas'][q]
+            beta = torch.tensor([[hyper['betas'][q]]], dtype=torch.float32)
         else:
             beta = None
 
-        if 'metas' in hyper:
-            meta = hyper['metas'][q]
+        if 'metadata' in hyper:
+            meta = hyper['metadata'][q].unsqueeze(0)
         else:
             meta = None
 
@@ -77,9 +50,9 @@ def generate_prediction(model, out_path, hyper, evaluation=None):
 
 
 if __name__ == '__main__':
-    torch.manual_seed(311412)
+    torch.manual_seed(31415926)
     # Pretrain IRT model
-    zero_train_matrix, train_matrix, valid_data, test_data = load_data()
+    prior_train_matrix, train_matrix, valid_data, test_data = load_data()
     thetas, betas, _, _, _ = irt(
         data=train_matrix.detach().numpy(),
         val_data=valid_data,
@@ -92,33 +65,37 @@ if __name__ == '__main__':
     question_num = train_matrix.shape[1]
     k_meta = 5
     metadata = read_encoded_question_metadata('../data/question_meta_encoded.csv', question_num, k_meta)
+    metadata = torch.tensor(metadata, dtype=torch.float32)
 
-    ks = [10, 20, 50]
-    lrs = [0.01]
-    epochs = [5, 10, 15, 20]
+    ks = [5, 6, 8, 10, 12, 15, 20, 30]
+    lrs = [0.001]
+    epochs = [10, 15, 20]
+    batch_sizes = [5, 10, 15, 20]
 
     for k in ks:
         for lr in lrs:
-            for epoch in epochs:
-                model = AutoEncoder(train_matrix.shape[0], k, 1 + k_meta)
-                hyper = {
-                    'lr': lr,
-                    'lamb': 0.001,
-                    'train_data': train_matrix,
-                    'zero_train_data': zero_train_matrix,
-                    'valid_data': valid_data,
-                    'num_epoch': epoch,
-                    'betas': betas,
-                    'metas': metadata
-                }
-                evaluation = {
-                    'train_data': zero_train_matrix,
-                    'valid_data': test_data,
-                    'betas': betas,
-                    'metas': metadata
-                }
-                print(f"Starting: k={k}, lr={lr}, epoch={epoch}")
-                generate_prediction(model, f'predictions/ae_meta_{k}_{lr}_{epoch}.csv', hyper, evaluation)
+            for batch_size in batch_sizes:
+                for epoch in epochs:
+                    model = AutoEncoder(train_matrix.shape[0], k, 1 + k_meta)
+                    hyper = {
+                        'lr': lr,
+                        'lamb': 0.0,
+                        'batch_size': batch_size,
+                        'train_data': train_matrix,
+                        'prior_train_data': prior_train_matrix,
+                        'valid_data': valid_data,
+                        'num_epoch': epoch,
+                        'betas': betas,
+                        'metadata': metadata
+                    }
+                    evaluation = {
+                        'train_data': prior_train_matrix,
+                        'valid_data': test_data,
+                        'betas': betas,
+                        'metadata': metadata
+                    }
+                    print(f"Starting: k={k}, lr={lr}, epoch={epoch}, batch_size={batch_size}")
+                    generate_prediction(model, f'predictions/ae_adam_{k}_{lr}_{epoch}_{batch_size}.csv', hyper, evaluation)
 
     print("Done")
     # k = 50

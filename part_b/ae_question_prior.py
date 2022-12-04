@@ -61,6 +61,12 @@ class AutoEncoder(nn.Module):
         self.g = nn.Linear(num_students, k)
         self.h = nn.Linear(k + extra_latent_dim, num_students)
 
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0)
+                print("Linear layer weight initialized to xavier_uniform_!")
+
     def get_weight_norm(self):
         """ Return ||W^1||^2 + ||W^2||^2.
 
