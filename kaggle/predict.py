@@ -3,7 +3,7 @@ This module generates files that can be used to submit
 to the CSC311 Kaggle competition.
 """
 from part_a.item_response import irt
-from part_b.ae_BGD import AutoEncoder, train, evaluate, read_encoded_question_metadata, load_data
+from part_b.ae_best_epoch import AutoEncoder, train, evaluate, read_encoded_question_metadata, load_data
 from utils import load_train_sparse, load_valid_csv, load_public_test_csv, \
     load_private_test_csv, save_private_test_csv
 import torch
@@ -16,9 +16,9 @@ def generate_prediction(model, out_path, hyper, evaluation=None):
     Generate a prediction using <model> with <hyper> as hyperparameters
     Write the prediction to <out_path>. Optionally evaluate using <evaluation>.
     """
-    train(model, **hyper)
+    best_model = train(model, **hyper)
     if evaluation is not None:
-        acc = evaluate(model, **evaluation)
+        acc = evaluate(best_model, **evaluation)
         print(f"Test accuracy: {acc}")
 
     private_test = load_private_test_csv('../data')
@@ -37,7 +37,7 @@ def generate_prediction(model, out_path, hyper, evaluation=None):
         else:
             meta = None
 
-        output = model(inputs, beta=beta, meta=meta)
+        output = best_model(inputs, beta=beta, meta=meta)
 
         if output[0][private_test['user_id'][i]].item() >= 0.5:
             predictions.append(1.)
