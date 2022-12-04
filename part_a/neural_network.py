@@ -2,7 +2,6 @@ from utils import *
 from torch.autograd import Variable
 
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 import matplotlib.pyplot as plt
@@ -10,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-import math
 from torch import sigmoid
 
 def load_data(base_path="../data"):
@@ -110,7 +108,6 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
-        valid_loss = 0
 
         for user_id in range(num_student):
             model.train()
@@ -280,7 +277,7 @@ def main():
             best_test_accuracy_so_far = valid_accuracy
             best_parameters = lamb
         accuracy_list.append(valid_accuracy)
-        print_string = "lambda = " + str(lamb) + " test accuracy = " + str(valid_accuracy)
+        print_string = "lambda = " + str(lamb) + " valid accuracy = " + str(valid_accuracy)
         print(print_string)
     print("best lambda is "  + str(best_parameters) + " best accuracy is "  + str(best_test_accuracy_so_far))
 
@@ -306,5 +303,5 @@ def main():
 
 
 if __name__ == "__main__":
-    torch.manual_seed(2023)
+    torch.manual_seed(208)
     main()
